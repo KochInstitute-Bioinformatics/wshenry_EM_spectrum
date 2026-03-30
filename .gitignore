@@ -5,11 +5,11 @@
 *.Rproj
 .Rprofile
 R/
+*.config/
+*.local/
 
 # Large files
-./TCGA_EMT/analysis/geneexpressionmatrix_uniqueIDs.gct
-./TCGA_EMT/analysis/EBPlusPlusAdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.tsv.gz
-./TCGA_EMT/analysis/emt_code/TCGA_BRCA_all_samples_RNASeq.txt
+# path to file
 
 # Data directories
 data/
