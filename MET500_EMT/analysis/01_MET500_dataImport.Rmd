@@ -1,0 +1,845 @@
+---
+title: "MET500 - Data Import and Exploration"
+author: "Charlie Whittaker"
+date: "03/25/26"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+  html_notebook: default
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+                      dev="png", message=FALSE, error=FALSE, warning=TRUE)
+```
+
+# Load Libraries
+
+```{r}
+library(openxlsx)
+library(tidyverse)
+library(ggrepel)
+library(ggpubr)
+library(XML)
+library(reprex)
+library(matrixStats)
+library(readxl)
+
+library(Seurat)
+library(SeuratWrappers)
+#library(Azimuth)
+library(patchwork)
+library(sctransform)
+library(celldex)
+library(SingleR)
+library(rtracklayer)
+library(apeglm)
+library(ComplexHeatmap)
+library(gprofiler2)
+library(cluster)
+library(fgsea)
+library(SingleCellExperiment)
+library(VAM)
+library(UCell)
+library(GSVA)
+library(GSEABase)
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
+
+#library(SoupX)
+#library(DoubletFinder)
+```
+
+# Load Local Code
+
+```{r}
+source('Rcode/data_formatting_tools.R')
+source('Rcode/analysis_tools.R')
+source('Rcode/plots.R')
+source('Rcode/common.R')
+source('Rcode/ssGSEA.Library.R')
+```
+
+# Read in MET500 data
+
+## Metadata
+
+```{r}
+meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+```
+
+## Gene expression data
+
+Note, the l2 data provided seems to have been transformed without a +1 offset so this needs to be redone
+
+```{r}
+M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+# M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+```
+
+```{r}
+M.mx.l2 <- log2(M.mx+1)
+```
+
+## Read in annotation
+
+```{r}
+annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+```
+
+## Join gene from annot to gene expression
+
+```{r}
+# Step 1: Extract rownames as column
+annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+
+# Step 2: Inner join (only rows in M.mx.l2)
+M.mx.l2.annotated <- expr_df %>%
+  inner_join(annot_df, by = "gene_id")
+
+# Step 3: Move gene_id back to rownames
+rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+
+# Step 4: Report on join success
+cat("=== JOIN REPORT ===\n\n")
+cat("Rows in annot:              ", nrow(annot), "\n")
+cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+
+# Check for unmatched
+unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+
+cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+
+# Success status
+if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+  cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+} else {
+  cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+  cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+}
+
+# View result
+cat("\nFinal structure:\n")
+print(head(M.mx.l2.annotated[, 1:8]))
+```
+
+## Repair data
+
+After annotation, there are examples of multiple rows per gene, this needs to be repaired using the MPG approach
+
+### Calculate means
+
+```{r}
+M.mx.l2.annotated <- mutate(M.mx.l2.annotated, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2.annotated, ends_with("XX")), na.rm = TRUE)))
+```
+
+### Adding MPG column
+
+Often multiple geneids will map to the same gene symbol. In these cases, it is helpful to select a representative geneID for each group of gene symbols. The code block below iterates through each unique gene symbol, compares all of the geneids associated with the same gene symbol and identifies the geneid with the highest average expression. This gene is then set as the representative (max-per-gene) geneid for that symbol. Note: If multiple geneids have the same highest avg expression, the first gene that appears in the dataframe is taken
+
+The code below performs the following steps:
+  1) Create a vector called "mpg" of "No" values the same length as the number of rows in the dataframe assembleData
+  2) Loop over the assembleDat object ... identifying index values of duplicate genes, updating mpg vector
+  3) Merge mpg vector to assemblDat object with setting column name as "MPG"
+
+
+```{r}
+mpg <- rep('No', nrow(M.mx.l2.annotated))
+
+for (i in unique(M.mx.l2.annotated[,"gene"])){
+    if (is.na(i)){next}
+    idxs <- which(M.mx.l2.annotated[,"gene"] == i)
+    max_idx <- which(M.mx.l2.annotated$Avg[idxs] == max(M.mx.l2.annotated$Avg[idxs]))[1]
+    
+    mpg[idxs[max_idx]] <- 'Yes'
+}
+
+M.mx.l2.annotated$MPG <- mpg
+```
+
+### Select only MPG == Yes and remove Avg col
+
+```{r}
+M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg,-MPG)
+```
+
+### Move gene to rowname and convert to matrix
+
+```{r}
+expr_matrix <- M.mx.l2.annotated %>%
+  rownames_to_column("old_id") %>%
+  dplyr::select(-old_id) %>%
+  column_to_rownames("gene")
+
+expr_matrix <- as.matrix(expr_matrix)
+```
+
+## Row-center and transpose the gene expression data for use later
+
+```{r}
+# Remove genes with zero variance BEFORE scaling
+gene_sds <- apply(expr_matrix, 1, sd)
+expr_matrix.filtered <- expr_matrix[gene_sds > 0, ]
+
+cat("Genes removed (zero variance):", nrow(expr_matrix) - nrow(expr_matrix), "\n")
+cat("Genes remaining:", nrow(expr_matrix), "\n")
+
+# Now row-center
+expr_matrix.rc <- calculate_zscore(expr_matrix.filtered)
+
+# Verify - should have NO NaN
+print(sum(is.nan(expr_matrix.rc)))
+```
+
+```{r}
+expr_matrix.rc.transposed <- t(expr_matrix.rc)
+```
+
+# Gene Sets
+
+```{r}
+Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+                 "CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+                 "NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+                 "NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+                 "SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+                 "AIFM2","AKR1C3","FTMT","ATG5")
+
+Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+                 "STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+
+Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+
+Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+
+Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+        "ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+        "ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+        "CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+        "CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+        "ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+        "ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+        "HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+        "MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+        "PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+
+Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+
+Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+                                         "CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+                                         "ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+                                         "HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+                                         "PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+                                         "SCD5","SIRT1","TBXAS1")
+
+Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+                    "CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+                    "ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+                    "LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+                    "MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+                    "PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+                    "PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+                    "PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+                    "PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+                    "PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+
+Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+           "CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+           "DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+           "GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+           "OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+
+# Ferroptosis_pathways2
+
+Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+                  "NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+                  "NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+                  "NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+                  "NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+                  "UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+                  "COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+                  "COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+
+Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+                                     "GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+                                     "MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+                                     "PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+                                     "TXN","TXNRD1","TXNRD2")
+
+LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+
+BH4 <- c("GCH1","PTS","QDPR","SPR")
+
+Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+
+Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+                 "GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+                 "GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+
+CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+
+Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+
+Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+                             "SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+                             "SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+
+homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+
+Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+
+Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+                "HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+                "PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+
+Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+           "MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+
+# EMT and Others
+
+EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+                    "DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+                    "CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+                    "ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+                    "APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+
+EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+                  "CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+                  "CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+                  "COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+                  "COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+                  "DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+                  "FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+                  "FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+                  "GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+                  "ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+                  "LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+                  "MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+                  "NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+                  "PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+                  "PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+                  "SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+                  "SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+                  "THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+                  "TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+
+EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+
+EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+              "CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+              "MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+              "TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+              "SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+              "TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+              "S100A11P1","CDH15","PATJ","TSKU")
+
+EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+                   "TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+                   "CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+                   "OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+                   "SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+
+EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+                       "TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+                       "PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+                       "TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+                       "LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+                       "OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+                       "ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+                       "AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+                       "C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+                       "C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+                       "ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+                       "SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+                       "MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+                       "CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+                       "COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+
+EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+                       "LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+                       "SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+                       "COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+                       "RECK","TMEFF1","PTRF")
+
+EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+                   "CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+                   "KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+                   "KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+                   "EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+                   "DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+                   "CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+                   "OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+                   "EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+                   "ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+                   "PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+                   "PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+                   "FAM174B","PTPRF","SORD")
+
+EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+                   "VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+                   "IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+                   "RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+                   "SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+                   "MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+                   "COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+                   "SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+                   "COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+                   "VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+                   "CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+                   "CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+                   "NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+                   "PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+
+LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+
+exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+```
+
+## Score gene sets for heatmap using gsva
+
+the heatmap contains the following gene sets:
+
+Gene list       pathway type
+Fatty acid uptake       Ferroptosis promotion
+LOXs    Ferroptosis promotion
+Iron intake WHv1        Ferroptosis promotion
+Iron utilization        Ferroptosis promotion
+Glutathione     Ferroptosis suppression
+BH4     Ferroptosis suppression
+CoQ10   Ferroptosis suppression
+ACSL4   Gene
+AGPS    Gene
+FAR1    Gene
+
+```{r}
+gsva_params <- gsvaParam(exprData = expr_matrix, 
+                         geneSets = list(
+                           Fatty_acid_uptake.gsva = Fatty_acid_uptake,
+                           LOXs.gsva = LOXs,
+                           Thioredoxin.gsva = Thioredoxin,
+                           Glutamate_transmembrane.gsva = Glutamate_transmembrane,
+                           Membrane_Lipid.gsva = Membrane_Lipid,
+                           Unsat_FA_biosynth_process.gsva = Unsaturated_FA_biosynthetic_process,
+                           Fatty_acid.gsva = Fatty_acid,
+                           Iron_intake.gsva = Iron_intake,
+                           Iron_utilization.gsva = Iron_utilization,
+                           Glutathione.gsva = Glutathione,
+                           BH4.gsva = BH4,
+                           CoQ10.gsva = CoQ10
+                         ))
+
+Heatmap.GSVA.scores <- gsva(gsva_params)
+```
+
+### Transpose gsva scores
+
+```{r}
+Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
+```
+
+# EMT scoring with Chakraborty KS methd
+
+## Import KS code
+
+```{r}
+source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+```
+
+## Point to signature file
+
+```{r}
+KSScore.EMTSignature.file = "./emt_code/EM_gene_signature_tumor_KS.xlsx"
+```
+
+## Calculate KS
+
+```{r}
+met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+met500.ks.emt <- as.data.frame(met500.ks.emt)
+```
+
+# Combine data for plotting
+
+```{r}
+# Convert all to dataframes with rownames as column
+gsva_df <- as.data.frame(Heatmap.GSVA.scores.transposed) %>% 
+  rownames_to_column("Sample")
+expr_df <- as.data.frame(expr_matrix.rc.transposed) %>% 
+  rownames_to_column("Sample")
+met_df <- as.data.frame(met500.ks.emt) %>% 
+  rownames_to_column("Sample")
+
+# Join all three by Sample
+merged_all <- gsva_df %>%
+  inner_join(expr_df, by = "Sample") %>%
+  inner_join(met_df, by = "Sample")
+
+# Convert Sample back to rownames
+rownames(merged_all) <- merged_all$Sample
+merged_all <- merged_all %>% dplyr::select(-Sample)
+
+# Report on join success
+cat("=== THREE-WAY JOIN REPORT ===\n\n")
+cat("Rows in GSVA scores:                  ", nrow(gsva_df), "\n")
+cat("Rows in expression matrix:            ", nrow(expr_df), "\n")
+cat("Rows in met500.ks.emt:                ", nrow(met_df), "\n")
+cat("Rows after inner_join:                ", nrow(merged_all), "\n\n")
+
+# Check for unmatched
+unmatched_gsva <- anti_join(gsva_df, expr_df, by = "Sample") %>% 
+  anti_join(met_df, by = "Sample")
+unmatched_expr <- anti_join(expr_df, gsva_df, by = "Sample") %>% 
+  anti_join(met_df, by = "Sample")
+unmatched_met <- anti_join(met_df, gsva_df, by = "Sample") %>% 
+  anti_join(expr_df, by = "Sample")
+
+cat("Samples in GSVA but NOT in others:    ", nrow(unmatched_gsva), "\n")
+cat("Samples in expr but NOT in others:    ", nrow(unmatched_expr), "\n")
+cat("Samples in met but NOT in others:     ", nrow(unmatched_met), "\n\n")
+
+# Success status
+if (nrow(merged_all) > 0) {
+  cat("✓ SUCCESS: Join completed!\n")
+  cat("  Final dimensions: ", nrow(merged_all), " samples × ", ncol(merged_all), " variables\n\n")
+} else {
+  cat("✗ ERROR: No matching samples found!\n")
+}
+
+# View result
+cat("Final structure:\n")
+print(head(merged_all[, 1:8]))
+```
+
+## Gene set scatter plots
+
+```{r,fig.height=6,fig.width=7}
+# Helper function to get correlation statistics
+get_cor_stats <- function(x, y) {
+  # Remove NA values
+  idx <- !is.na(x) & !is.na(y)
+  x <- x[idx]
+  y <- y[idx]
+  
+  # Calculate correlation
+  cor_test <- cor.test(x, y, method = "pearson")
+  r_squared <- cor_test$estimate^2
+  p_value <- cor_test$p.value
+  
+  return(list(r_squared = r_squared, p_value = p_value))
+}
+
+# Plot 1: BH4.gsva
+stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (R² = %.2f, p = %.2e)", 
+                  stats1$r_squared, stats1$p_value)
+
+ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+  labs(
+    title = title1,
+    x = "met500.ks.emt",
+    y = "BH4 gsva"
+  ) +
+  theme_minimal()
+
+# Plot 2: ACSL4
+stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (R² = %.2f, p = %.2e)", 
+                  stats2$r_squared, stats2$p_value)
+
+ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+  labs(
+    title = title2,
+    x = "met500.ks.emt",
+    y = "ACSL4 (Z-Score)"
+  ) +
+  theme_minimal()
+
+# Plot 3: GCH1
+stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (R² = %.2f, p = %.2e)", 
+                  stats3$r_squared, stats3$p_value)
+
+ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+  geom_point(color = "steelblue", size = 2) +
+  geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+  labs(
+    title = title3,
+    x = "met500.ks.emt",
+    y = "GCH1 (Z-Score)"
+  ) +
+  theme_minimal()
+```
+
+# Prepare Heatmap version 1
+
+## Select data to plot
+
+```{r}
+merged_all.df <- merged_all %>% rownames_to_column("Sample")
+
+heat.data <- merged_all.df %>% 
+  dplyr::select(all_of(c("Sample",
+                         "met500.ks.emt",
+                         "Fatty_acid_uptake.gsva","LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+                         "Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva","CoQ10.gsva",
+                         "ACSL4","AGPS","FAR1","GCH1")))
+```
+
+```{r,fig.width=22,fig.height=7}
+# Sort by EMT_KS_Score
+heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+
+# Define genes in order
+genes_to_plot <- c("met500.ks.emt",
+                   "Fatty_acid_uptake.gsva", "LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva", 
+                   "Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva","Thioredoxin.gsva","Glutamate_transmembrane.gsva","CoQ10.gsva", 
+                   "ACSL4", "AGPS", "FAR1", "GCH1")
+
+# Create matrix
+heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+heatmap_data <- t(heatmap_data)
+
+# Define groups
+group_vec <- c("SortOrder",
+               "Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion",
+               "Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression",
+               "Gene", "Gene", "Gene", "Gene"
+)
+
+# Create row split factor for spacing
+row_split <- factor(group_vec, 
+                    levels = c("SortOrder", "Ferroptosis promotion", 
+                              "Ferroptosis suppression", "Gene"))
+
+# Create color functions
+# Row 1: SortOrder
+# Rows 2-13: Ferroptosis (12 rows)
+# Rows 14-17: Genes (4 rows)
+ferroptosis_data <- heatmap_data[2:13, ]
+gene_data <- heatmap_data[14:17, ]
+sortorder_data <- heatmap_data[1, ]
+
+# Ferroptosis color scale
+ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)), 
+                                c("blue", "white", "red"))
+
+# Gene color scale: white to dark purple, with 75th percentile as cutoff
+# gene_75_percentile <- quantile(gene_data, 0.75)
+gene_cols <- colorRamp2(c(min(gene_data), 0, max(gene_data)), c("blue", "white", "red"))
+
+# SortOrder color scale: orange to green
+sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)), 
+                              c("darkorange", "lightgreen"))
+
+# Step 6: Create heatmap WITH left annotation for group bars
+ht <- Heatmap(heatmap_data,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE,
+        row_split = row_split,
+        row_gap = unit(3, "mm"),
+        row_names_side = "right",
+        show_column_names = FALSE,
+        show_heatmap_legend = FALSE,
+        left_annotation = rowAnnotation(
+          Group = group_vec,
+          col = list(Group = c("SortOrder" = "darkgreen",
+                               "Ferroptosis promotion" = "steelblue",
+                               "Ferroptosis suppression" = "coral",
+                               "Gene" = "brown")),
+          show_legend = FALSE,
+          simple_anno_size = unit(0.8, "cm"),
+          gp = gpar(fontsize = 9)
+        ),
+        cell_fun = function(j, i, x, y, w, h, fill) {
+          if(i == 1) {
+            # SortOrder row
+            fill_color <- sortorder_cols(heatmap_data[i, j])
+          } else if(i <= 13) {
+            # Ferroptosis rows
+            fill_color <- ferroptosis_cols(heatmap_data[i, j])
+          } else {
+            # Gene rows
+            fill_color <- gene_cols(heatmap_data[i, j])
+          }
+          grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+        },
+        rect_gp = gpar(type = "none"),
+        name = "Value",
+        width = ncol(heatmap_data)*unit(0.3, "mm"),
+        height = nrow(heatmap_data)*unit(9, "mm"))
+
+# Create separate legends
+group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion", 
+                              "Ferroptosis suppression", "Gene"),
+                       labels = c("SortOrder", "Ferroptosis promotion", 
+                                  "Ferroptosis suppression", "Gene"),
+                       legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral", "brown")),
+                       title = "Group Category")
+
+gene_legend <- Legend(col_fun = gene_cols,
+                      title = "Gene Expression\nZ-Score",
+                      direction = "vertical")
+
+ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+                             title = "GSVA Scores",
+                             direction = "vertical")
+
+sortorder_legend <- Legend(col_fun = sortorder_cols,
+                           title = "Sort Order\n(EMT_KS_Score)",
+                           direction = "vertical")
+
+# Step 8: Draw with legends
+pdf("heatmap.pdf", width = 22, height = 7)
+draw(ht, 
+     annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+     annotation_legend_side = "right",
+     padding = unit(c(1, 1, 1, 1), "cm"))
+dev.off()
+
+# Or view in RStudio
+draw(ht, 
+     annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+     annotation_legend_side = "right",
+     padding = unit(c(1, 1, 1, 1), "cm"))
+```
+
+# Prepare Heatmap version 2
+
+This version removes the genes from the plot. removes LOX and CoQ10, and reorders the gene sets
+
+```{r}
+merged_all.df <- merged_all %>% rownames_to_column("Sample")
+
+heat.data <- merged_all.df %>% 
+  dplyr::select(all_of(c("Sample",
+                         "met500.ks.emt",
+                         "Fatty_acid_uptake.gsva","Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+                         "Iron_utilization.gsva", "Glutathione.gsva", 
+                         "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva")))
+```
+
+```{r,fig.width=22,fig.height=7}
+# Sort by EMT_KS_Score
+heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+
+# Define genes in order
+genes_to_plot <- c("met500.ks.emt",
+                   "Fatty_acid_uptake.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva", "Membrane_Lipid.gsva", "Iron_intake.gsva", "Iron_utilization.gsva",
+                   "BH4.gsva","Thioredoxin.gsva","Glutathione.gsva","Glutamate_transmembrane.gsva")
+
+# Create matrix
+heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+heatmap_data <- t(heatmap_data)
+
+# Define groups
+group_vec <- c("SortOrder",
+               "Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion",
+               "Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression")
+
+# Create row split factor for spacing
+row_split <- factor(group_vec, 
+                    levels = c("SortOrder", 
+                               "Ferroptosis promotion",
+                               "Ferroptosis suppression"))
+
+# Create color functions
+# Row 1: SortOrder
+# Rows 2-11: Ferroptosis (12 rows)
+ferroptosis_data <- heatmap_data[2:11, ]
+sortorder_data <- heatmap_data[1, ]
+
+# Ferroptosis color scale
+ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)), 
+                                c("blue", "white", "red"))
+
+# SortOrder color scale: orange to green
+sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)), 
+                              c("darkorange", "lightgreen"))
+
+# Create heatmap WITH left annotation for group bars
+ht <- Heatmap(heatmap_data,
+        cluster_rows = FALSE,
+        cluster_columns = FALSE,
+        row_split = row_split,
+        row_gap = unit(3, "mm"),
+        row_names_side = "right",
+        show_column_names = FALSE,
+        show_heatmap_legend = FALSE,
+        left_annotation = rowAnnotation(
+          Group = group_vec,
+          col = list(Group = c("SortOrder" = "darkgreen",
+                               "Ferroptosis promotion" = "steelblue",
+                               "Ferroptosis suppression" = "coral")),
+          show_legend = FALSE,
+          simple_anno_size = unit(0.8, "cm"),
+          gp = gpar(fontsize = 9)
+        ),
+        cell_fun = function(j, i, x, y, w, h, fill) {
+          if(i == 1) {
+            # SortOrder row
+            fill_color <- sortorder_cols(heatmap_data[i, j])
+          } else if(i <= 11) {
+            # Ferroptosis rows
+            fill_color <- ferroptosis_cols(heatmap_data[i, j])
+          }
+          grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+        },
+        rect_gp = gpar(type = "none"),
+        name = "Value",
+        width = ncol(heatmap_data)*unit(0.3, "mm"),
+        height = nrow(heatmap_data)*unit(9, "mm"))
+
+# Create separate legends
+group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion", 
+                              "Ferroptosis suppression"),
+                       labels = c("SortOrder", "Ferroptosis promotion", 
+                                  "Ferroptosis suppression"),
+                       legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral")),
+                       title = "Group Category")
+
+ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+                             title = "GSVA Scores",
+                             direction = "vertical")
+
+sortorder_legend <- Legend(col_fun = sortorder_cols,
+                           title = "Sort Order\n(EMT_KS_Score)",
+                           direction = "vertical")
+
+# Step 8: Draw with legends
+pdf("heatmap_v2.pdf", width = 22, height = 7)
+draw(ht, 
+     annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend),
+     annotation_legend_side = "right",
+     padding = unit(c(1, 1, 1, 1), "cm"))
+dev.off()
+
+# Or view in RStudio
+draw(ht, 
+     annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend),
+     annotation_legend_side = "right",
+     padding = unit(c(1, 1, 1, 1), "cm"))
+```
+
+# write session info
+
+Capturing information about the R session helps document your work
+
+```{r}
+sessionInfo()
+writeLines(capture.output(sessionInfo()), "01_MET500_dataImport_sessionInfo.txt")
+```

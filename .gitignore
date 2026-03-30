@@ -1,0 +1,50 @@
+# R files and directories
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+.Rprofile
+R/
+
+# Large files
+./TCGA_EMT/analysis/geneexpressionmatrix_uniqueIDs.gct
+./TCGA_EMT/analysis/EBPlusPlusAdjustPANCAN_IlluminaHiSeq_RNASeqV2.geneExp.tsv.gz
+./TCGA_EMT/analysis/emt_code/TCGA_BRCA_all_samples_RNASeq.txt
+
+# Data directories
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Build/Cache directories
+build/
+dist/
+.cache/
+*.egg-info
+
+# Log files
+*.log
+*.out
+
+# Temporary files
+*.tmp
+*~
+
+# Jupyter notebooks (optional - uncomment if you use them)
+# .ipynb_checkpoints/
+# *.ipynb
+
+# Large binary files
+*.zip
+*.tar.gz
+*.rar

@@ -1,0 +1,2575 @@
+1774444593925:knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+1774444593991:dev="png", message=FALSE, error=FALSE, warning=TRUE)
+1774444621784:library(openxlsx)
+1774444622095:library(tidyverse)
+1774444623366:library(ggrepel)
+1774444623378:library(ggpubr)
+1774444623443:library(XML)
+1774444623544:library(reprex)
+1774444623591:library(matrixStats)
+1774444623602:library(readxl)
+1774444623612:library(Seurat)
+1774444626599:library(SeuratWrappers)
+1774444626671:#library(Azimuth)
+1774444626672:library(patchwork)
+1774444626679:library(sctransform)
+1774444626686:library(celldex)
+1774444634156:library(SingleR)
+1774444634347:library(rtracklayer)
+1774444635515:library(apeglm)
+1774444636637:library(ComplexHeatmap)
+1774444636862:library(gprofiler2)
+1774444636872:library(cluster)
+1774444636881:library(fgsea)
+1774444636900:library(SingleCellExperiment)
+1774444637198:library(VAM)
+1774444637230:library(UCell)
+1774444637247:library(GSVA)
+1774444638908:library(GSEABase)
+1774444638953:library(ComplexHeatmap)
+1774444638954:library(circlize)
+1774444638964:library(grid)
+1774444638965:#library(SoupX)
+1774444638966:#library(DoubletFinder)
+1774444649668:source('Rcode/data_formatting_tools.R')
+1774444649803:source('Rcode/analysis_tools.R')
+1774444649911:source('Rcode/plots.R')
+1774444649974:source('Rcode/common.R')
+1774444650004:source('Rcode/ssGSEA.Library.R')
+1774444727087:meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+1774444731947:head(meta)
+1774444746216:table(meta$sample_type)
+1774444755744:table(meta$dataset)
+1774444761514:table(meta$tissue)
+1774444780473:table(meta$biopsy_tissue)
+1774444801826:head(meta)
+1774444955593:as.data.frame(table(meta$tissue))
+1774445069334:meta[meta$tissue == "", ]
+1774445094176:as.data.frame(table(meta$cohort))
+1774451947281:M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+1774451997602:M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+1774452007960:M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+1774452975541:dim(M.mx)
+1774452984581:dim(M.mx.l2)
+1774452988340:dim(M.mx.l2.z)
+1774453148982:Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+1774453148985:"CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+1774453148986:"NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+1774453148988:"NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+1774453148990:"SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+1774453148992:"AIFM2","AKR1C3","FTMT","ATG5")
+1774453148996:Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+1774453148998:"STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+1774453149002:Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+1774453149005:Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+1774453149008:Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+1774453149010:"ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+1774453149049:"ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+1774453149051:"CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+1774453149053:"CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+1774453149054:"ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+1774453149056:"ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+1774453149058:"HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+1774453149059:"MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+1774453149061:"PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+1774453149065:Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+1774453149068:Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+1774453149069:"CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+1774453149071:"ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+1774453149072:"HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+1774453149074:"PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+1774453149075:"SCD5","SIRT1","TBXAS1")
+1774453149078:Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+1774453149080:"CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+1774453149081:"ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+1774453149082:"LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+1774453149084:"MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+1774453149085:"PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+1774453149087:"PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+1774453149088:"PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+1774453149089:"PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+1774453149091:"PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+1774453149094:Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+1774453149095:"CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+1774453149097:"DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+1774453149098:"GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+1774453149099:"OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+1774453149102:# Ferroptosis_pathways2
+1774453149104:Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+1774453149105:"NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+1774453149106:"NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+1774453149107:"NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+1774453149109:"NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+1774453149110:"UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+1774453149111:"COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+1774453149112:"COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+1774453149115:Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+1774453149116:"GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+1774453149118:"MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+1774453149119:"PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+1774453149120:"TXN","TXNRD1","TXNRD2")
+1774453149123:LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+1774453149125:BH4 <- c("GCH1","PTS","QDPR","SPR")
+1774453149127:Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+1774453149131:Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+1774453149133:"GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+1774453149134:"GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+1774453149137:CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+1774453149139:Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+1774453149142:Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+1774453149143:"SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+1774453149144:"SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+1774453149184:homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+1774453149189:Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+1774453149193:Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+1774453149196:"HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+1774453149198:"PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+1774453149202:Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+1774453149204:"MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+1774453149208:# EMT and Others
+1774453149210:EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+1774453149211:"DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+1774453149213:"CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+1774453149215:"ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+1774453149217:"APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+1774453149220:EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+1774453149222:"CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+1774453149226:"CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+1774453149228:"COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+1774453149229:"COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+1774453149231:"DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+1774453149233:"FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+1774453149234:"FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+1774453149236:"GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+1774453149237:"ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+1774453149239:"LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+1774453149241:"MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+1774453149242:"NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+1774453149244:"PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+1774453149246:"PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+1774453149247:"SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+1774453149249:"SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+1774453149250:"THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+1774453149252:"TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+1774453149256:EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+1774453149259:EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+1774453149260:"CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+1774453149262:"MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+1774453149263:"TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+1774453149264:"SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+1774453149266:"TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+1774453149267:"S100A11P1","CDH15","PATJ","TSKU")
+1774453149270:EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+1774453149271:"TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+1774453149273:"CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+1774453149274:"OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+1774453149275:"SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+1774453149278:EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+1774453149279:"TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+1774453149280:"PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+1774453149282:"TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+1774453149283:"LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+1774453149284:"OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+1774453149285:"ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+1774453149287:"AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+1774453149288:"C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+1774453149289:"C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+1774453149290:"ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+1774453149292:"SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+1774453149293:"MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+1774453149294:"CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+1774453149295:"COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+1774453149298:EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+1774453149300:"LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+1774453149301:"SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+1774453149302:"COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+1774453149303:"RECK","TMEFF1","PTRF")
+1774453149306:EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+1774453149307:"CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+1774453149308:"KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+1774453149309:"KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+1774453149310:"EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+1774453149312:"DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+1774453149313:"CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+1774453149314:"OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+1774453149315:"EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+1774453149316:"ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+1774453149318:"PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+1774453149319:"PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+1774453149320:"FAM174B","PTPRF","SORD")
+1774453149323:EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+1774453149324:"VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+1774453149326:"IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+1774453149327:"RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+1774453149328:"SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+1774453149330:"MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+1774453149331:"COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+1774453149332:"SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+1774453149333:"COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+1774453149334:"VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+1774453149336:"CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+1774453149337:"CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+1774453149338:"NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+1774453149339:"PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+1774453149343:LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+1774453149345:exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+1774453233577:ls()
+1774453273699:class(M.mx.l2)
+1774453285194:M.mx.l2[1:5,1:5]
+1774453365102:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774453370735:dim(annot)
+1774453376067:head(annot)
+1774453383610:M.mx.l2[1:5,1:5]
+1774453528529:# Step 1: Extract rownames as column
+1774453528533:annot_df <- annot %>% rownames_to_column("gene_id")
+1774453528665:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774453528693:# Step 2: Inner join (only rows in M.mx.l2)
+1774453528694:M.mx.l2.annotated <- expr_df %>%
+1774453528696:inner_join(annot_df, by = "gene_id")
+1774453529130:# Step 3: Move gene_id back to rownames
+1774453529131:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774453529149:M.mx.l2.annotated <- M.mx.l2.annotated %>% select(-gene_id)
+1774453541459:# Step 1: Extract rownames as column
+1774453541462:annot_df <- annot %>% rownames_to_column("gene_id")
+1774453541576:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774453541598:# Step 2: Inner join (only rows in M.mx.l2)
+1774453541600:M.mx.l2.annotated <- expr_df %>%
+1774453541601:inner_join(annot_df, by = "gene_id")
+1774453541748:# Step 3: Move gene_id back to rownames
+1774453541749:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774453541766:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774453541792:# Step 4: Report on join success
+1774453541793:cat("=== JOIN REPORT ===\n\n")
+1774453541795:cat("Rows in annot:              ", nrow(annot), "\n")
+1774453541797:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774453541799:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774453541801:# Check for unmatched
+1774453541803:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774453541896:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774453542343:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774453542344:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774453542346:# Success status
+1774453542346:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774453542347:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774453542348:} else {
+1774453542349:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774453542350:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774453542351:}
+1774453542353:# View result
+1774453542354:cat("\nFinal structure:\n")
+1774453542355:print(head(M.mx.l2.annotated[, 1:8]))
+1774453628034:tail(colnames(M.mx.l2.annotated))
+1774453914814:# Step 1: Extract rownames as column
+1774453914818:annot_df <- annot %>% rownames_to_column("gene_id") %>% select(gene_id, gene)
+1774453925696:meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+1774453926770:M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+1774453968526:M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+1774453983255:M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+1774453989139:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774453996426:# Step 1: Extract rownames as column
+1774453996429:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774453996553:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774453996578:# Step 2: Inner join (only rows in M.mx.l2)
+1774453996579:M.mx.l2.annotated <- expr_df %>%
+1774453996581:inner_join(annot_df, by = "gene_id")
+1774453996809:# Step 3: Move gene_id back to rownames
+1774453996811:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774453996829:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774453996878:# Step 4: Report on join success
+1774453996879:cat("=== JOIN REPORT ===\n\n")
+1774453996881:cat("Rows in annot:              ", nrow(annot), "\n")
+1774453996883:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774453996885:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774453996888:# Check for unmatched
+1774453996890:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774453996995:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774453997067:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774453997069:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774453997072:# Success status
+1774453997073:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774453997075:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774453997076:} else {
+1774453997078:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774453997079:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774453997080:}
+1774453997084:# View result
+1774453997085:cat("\nFinal structure:\n")
+1774453997087:print(head(M.mx.l2.annotated[, 1:8]))
+1774454141223:tail(colnames(M.mx.l2.annotated))
+1774454202984:expr_matrix <- M.mx.l2.annotated %>%
+1774454202987:column_to_rownames("gene") %>%
+1774454202990:as.matrix()
+1774454303258:expr_matrix <- M.mx.l2.annotated %>%
+1774454303260:rownames_to_column("old_id") %>%
+1774454303263:dplyr::select(-old_id) %>%
+1774454303266:column_to_rownames("gene") %>%
+1774454303268:as.matrix()
+1774454344058:head(M.mx)
+1774454364487:M.mx[1:4,1:4]
+1774454590979:M.mx.l2 <- log2(M.mx+1)
+1774454604212:M.mx.l2[1:4,1:4]
+1774454611280:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774454725656:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774454729008:# Step 1: Extract rownames as column
+1774454729010:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774454729124:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774454729198:# Step 2: Inner join (only rows in M.mx.l2)
+1774454729199:M.mx.l2.annotated <- expr_df %>%
+1774454729201:inner_join(annot_df, by = "gene_id")
+1774454729514:# Step 3: Move gene_id back to rownames
+1774454729516:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774454729540:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774454729568:# Step 4: Report on join success
+1774454729570:cat("=== JOIN REPORT ===\n\n")
+1774454729572:cat("Rows in annot:              ", nrow(annot), "\n")
+1774454729574:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774454729576:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774454729579:# Check for unmatched
+1774454729580:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774454729669:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774454729727:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774454729729:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774454729731:# Success status
+1774454729732:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774454729734:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774454729735:} else {
+1774454729736:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774454729738:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774454729739:}
+1774454729741:# View result
+1774454729743:cat("\nFinal structure:\n")
+1774454729744:print(head(M.mx.l2.annotated[, 1:8]))
+1774454870340:M.mx.l2 <- mutate(M.mx.l2, Avg = rowMeans(M.mx.l2), na.rm = TRUE))
+1774454883112:M.mx.l2 <- mutate(M.mx.l2, Avg = rowMeans(M.mx.l2), na.rm = TRUE)
+1774454958421:mpg <- rep('No', nrow(M.mx.l2))
+1774454958426:for (i in unique(M.mx.l2[,"gene"])){
+1774454958428:if (is.na(i)){next}
+1774454958430:idxs <- which(M.mx.l2[,"gene"] == i)
+1774454958431:max_idx <- which(M.mx.l2$Avg[idxs] == max(M.mx.l2$Avg[idxs]))[1]
+1774454958434:mpg[idxs[max_idx]] <- 'Yes'
+1774454958436:}
+1774454994673:tail(colnames(M.mx.l2))
+1774455030049:colnames(M.mx.l2)
+1774455092839:knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+1774455092841:dev="png", message=FALSE, error=FALSE, warning=TRUE)
+1774455094721:library(openxlsx)
+1774455094724:library(tidyverse)
+1774455094725:library(ggrepel)
+1774455094726:library(ggpubr)
+1774455094727:library(XML)
+1774455094728:library(reprex)
+1774455094729:library(matrixStats)
+1774455094730:library(readxl)
+1774455094731:library(Seurat)
+1774455094732:library(SeuratWrappers)
+1774455094733:#library(Azimuth)
+1774455094734:library(patchwork)
+1774455094735:library(sctransform)
+1774455094736:library(celldex)
+1774455094737:library(SingleR)
+1774455094738:library(rtracklayer)
+1774455094739:library(apeglm)
+1774455094740:library(ComplexHeatmap)
+1774455094742:library(gprofiler2)
+1774455094743:library(cluster)
+1774455094744:library(fgsea)
+1774455094745:library(SingleCellExperiment)
+1774455094746:library(VAM)
+1774455094747:library(UCell)
+1774455094748:library(GSVA)
+1774455094749:library(GSEABase)
+1774455094750:library(ComplexHeatmap)
+1774455094751:library(circlize)
+1774455094752:library(grid)
+1774455094753:#library(SoupX)
+1774455094754:#library(DoubletFinder)
+1774455098692:source('Rcode/data_formatting_tools.R')
+1774455098708:source('Rcode/analysis_tools.R')
+1774455098759:source('Rcode/plots.R')
+1774455098811:source('Rcode/common.R')
+1774455098831:source('Rcode/ssGSEA.Library.R')
+1774455102051:meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+1774455105405:M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+1774455131365:# M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+1774455131366:M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+1774455310052:M.mx.l2 <- log2(M.mx+1)
+1774455315312:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774455415539:# Method 1: Check if ALL columns end with "XX"
+1774455415541:all_end_with_XX <- all(grepl("XX$", colnames(expr_matrix)))
+1774455488805:# Method 1: Check if ALL columns end with "XX"
+1774455488806:all_end_with_XX <- all(grepl("XX$", colnames(M.mx.l2)))
+1774455488811:cat("All column names end with 'XX':", all_end_with_XX, "\n")
+1774455488814:# Method 2: Find columns that DON'T end with "XX"
+1774455488815:bad_cols <- colnames(M.mx.l2)[!grepl("XX$", colnames(M.mx.l2))]
+1774455488859:cat("Number of columns NOT ending with 'XX':", length(bad_cols), "\n")
+1774455488861:if (length(bad_cols) > 0) {
+1774455488862:cat("Columns that don't end with 'XX':\n")
+1774455488863:print(bad_cols)
+1774455488865:}
+1774455488866:# Method 3: Summary report
+1774455488868:cat("\n=== COLUMN NAME CHECK ===\n")
+1774455488869:cat("Total columns:", ncol(M.mx.l2), "\n")
+1774455488872:cat("Columns ending with 'XX':", sum(grepl("XX$", colnames(M.mx.l2))), "\n")
+1774455488875:cat("Columns NOT ending with 'XX':", sum(!grepl("XX$", colnames(M.mx.l2))), "\n")
+1774455488878:# Method 4: View first and last few column names
+1774455488879:cat("\nFirst 5 column names:\n")
+1774455488881:print(head(colnames(M.mx.l2), 5))
+1774455488884:cat("\nLast 5 column names:\n")
+1774455488886:print(tail(colnames(M.mx.l2), 5))
+1774455503595:M.mx.l2 <- log2(M.mx+1)
+1774455505893:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774455514573:# Step 1: Extract rownames as column
+1774455514574:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774455514678:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774455514703:# Step 2: Inner join (only rows in M.mx.l2)
+1774455514705:M.mx.l2.annotated <- expr_df %>%
+1774455514706:inner_join(annot_df, by = "gene_id")
+1774455514914:# Step 3: Move gene_id back to rownames
+1774455514915:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774455514933:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774455514954:# Step 4: Report on join success
+1774455514955:cat("=== JOIN REPORT ===\n\n")
+1774455514956:cat("Rows in annot:              ", nrow(annot), "\n")
+1774455514958:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774455514959:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774455514962:# Check for unmatched
+1774455514963:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774455515066:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774455515119:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774455515120:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774455515122:# Success status
+1774455515123:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774455515124:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774455515125:} else {
+1774455515126:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774455515127:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774455515127:}
+1774455515129:# View result
+1774455515130:cat("\nFinal structure:\n")
+1774455515131:print(head(M.mx.l2.annotated[, 1:8]))
+1774455561350:M.mx.l2 <- mutate(M.mx.l2, Var = rowVars(as.matrix(select(M.mx.l2, ends_with("XX")), na.rm = TRUE)))
+1774455579749:M.mx.l2 <- mutate(M.mx.l2, Var = rowVars(as.matrix(dplyr::select(M.mx.l2, ends_with("XX")), na.rm = TRUE)))
+1774455599461:head(M.mx.l2)
+1774455630193:M.mx.l2 <- log2(M.mx+1)
+1774455631719:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774455633320:# Step 1: Extract rownames as column
+1774455633323:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774455633447:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774455633471:# Step 2: Inner join (only rows in M.mx.l2)
+1774455633472:M.mx.l2.annotated <- expr_df %>%
+1774455633474:inner_join(annot_df, by = "gene_id")
+1774455633613:# Step 3: Move gene_id back to rownames
+1774455633614:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774455633630:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774455633650:# Step 4: Report on join success
+1774455633651:cat("=== JOIN REPORT ===\n\n")
+1774455633653:cat("Rows in annot:              ", nrow(annot), "\n")
+1774455633654:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774455633656:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774455633658:# Check for unmatched
+1774455633659:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774455633750:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774455633811:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774455633813:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774455633815:# Success status
+1774455633816:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774455633817:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774455633818:} else {
+1774455633820:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774455633821:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774455633822:}
+1774455633824:# View result
+1774455633826:cat("\nFinal structure:\n")
+1774455633827:print(head(M.mx.l2.annotated[, 1:8]))
+1774455637274:M.mx.l2 <- mutate(M.mx.l2, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2, ends_with("XX")), na.rm = TRUE)))
+1774455650143:head(M.mx.l2)
+1774455659144:mpg <- rep('No', nrow(M.mx.l2))
+1774455659150:for (i in unique(M.mx.l2[,"gene"])){
+1774455659152:if (is.na(i)){next}
+1774455659153:idxs <- which(M.mx.l2[,"gene"] == i)
+1774455659155:max_idx <- which(M.mx.l2$Avg[idxs] == max(M.mx.l2$Avg[idxs]))[1]
+1774455659158:mpg[idxs[max_idx]] <- 'Yes'
+1774455659160:}
+1774455690287:M.mx.l2 <- log2(M.mx+1)
+1774455693009:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774455695527:# Step 1: Extract rownames as column
+1774455695529:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774455695637:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774455695658:# Step 2: Inner join (only rows in M.mx.l2)
+1774455695659:M.mx.l2.annotated <- expr_df %>%
+1774455695660:inner_join(annot_df, by = "gene_id")
+1774455695793:# Step 3: Move gene_id back to rownames
+1774455695795:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774455695810:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774455695829:# Step 4: Report on join success
+1774455695831:cat("=== JOIN REPORT ===\n\n")
+1774455695832:cat("Rows in annot:              ", nrow(annot), "\n")
+1774455695834:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774455695836:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774455695838:# Check for unmatched
+1774455695839:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774455695925:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774455695988:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774455695990:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774455695992:# Success status
+1774455695993:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774455695994:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774455695995:} else {
+1774455695996:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774455695998:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774455695999:}
+1774455696001:# View result
+1774455696002:cat("\nFinal structure:\n")
+1774455696004:print(head(M.mx.l2.annotated[, 1:8]))
+1774455717720:M.mx.l2 <- mutate(M.mx.l2, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2, ends_with("XX")), na.rm = TRUE)))
+1774455722637:head(M.mx.l2)
+1774455753334:tail(colnames(M.mx.l2))
+1774455781899:M.mx.l2.annotated <- mutate(M.mx.l2.annotated, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2.annotated, ends_with("XX")), na.rm = TRUE)))
+1774455790157:tail(colnames(M.mx.l2.annotated))
+1774455795148:mpg <- rep('No', nrow(M.mx.l2))
+1774455795153:for (i in unique(M.mx.l2[,"gene"])){
+1774455795155:if (is.na(i)){next}
+1774455795157:idxs <- which(M.mx.l2[,"gene"] == i)
+1774455795159:max_idx <- which(M.mx.l2$Avg[idxs] == max(M.mx.l2$Avg[idxs]))[1]
+1774455795162:mpg[idxs[max_idx]] <- 'Yes'
+1774455795164:}
+1774455818176:mpg <- rep('No', nrow(M.mx.l2.annotated))
+1774455818181:for (i in unique(M.mx.l2.annotated[,"gene"])){
+1774455818183:if (is.na(i)){next}
+1774455818185:idxs <- which(M.mx.l2.annotated[,"gene"] == i)
+1774455818224:max_idx <- which(M.mx.l2.annotated$Avg[idxs] == max(M.mx.l2.annotated$Avg[idxs]))[1]
+1774455818227:mpg[idxs[max_idx]] <- 'Yes'
+1774455818229:}
+1774455822575:M.mx.l2.annotated$MPG <- mpg
+1774455974023:table(M.mx.l2.annotated$MPG)
+1774456066659:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg)
+1774456105712:expr_matrix <- M.mx.l2.annotated %>%
+1774456105714:rownames_to_column("old_id") %>%
+1774456105716:dplyr::select(-old_id) %>%
+1774456105718:column_to_rownames("gene") %>%
+1774456105720:as.matrix()
+1774456179861:Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+1774456179863:"CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+1774456179865:"NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+1774456179867:"NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+1774456179869:"SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+1774456179871:"AIFM2","AKR1C3","FTMT","ATG5")
+1774456179876:Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+1774456179878:"STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+1774456179918:Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+1774456179921:Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+1774456179925:Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+1774456179926:"ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+1774456179928:"ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+1774456179930:"CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+1774456179931:"CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+1774456179933:"ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+1774456179934:"ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+1774456179936:"HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+1774456179937:"MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+1774456179939:"PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+1774456179943:Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+1774456179946:Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+1774456179947:"CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+1774456179949:"ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+1774456179950:"HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+1774456179951:"PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+1774456179953:"SCD5","SIRT1","TBXAS1")
+1774456179956:Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+1774456179957:"CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+1774456179959:"ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+1774456179960:"LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+1774456179961:"MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+1774456179963:"PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+1774456179964:"PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+1774456179966:"PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+1774456179967:"PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+1774456179968:"PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+1774456179972:Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+1774456179973:"CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+1774456179974:"DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+1774456179976:"GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+1774456179977:"OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+1774456179980:# Ferroptosis_pathways2
+1774456179982:Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+1774456179983:"NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+1774456179984:"NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+1774456179985:"NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+1774456179987:"NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+1774456179988:"UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+1774456179989:"COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+1774456179990:"COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+1774456179993:Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+1774456179995:"GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+1774456179996:"MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+1774456179997:"PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+1774456179998:"TXN","TXNRD1","TXNRD2")
+1774456180001:LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+1774456180004:BH4 <- c("GCH1","PTS","QDPR","SPR")
+1774456180006:Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+1774456180009:Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+1774456180024:"GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+1774456180027:"GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+1774456180032:CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+1774456180037:Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+1774456180042:Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+1774456180045:"SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+1774456180047:"SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+1774456180051:homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+1774456180056:Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+1774456180060:Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+1774456180062:"HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+1774456180064:"PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+1774456180068:Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+1774456180070:"MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+1774456180074:# EMT and Others
+1774456180076:EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+1774456180078:"DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+1774456180080:"CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+1774456180082:"ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+1774456180084:"APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+1774456180087:EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+1774456180089:"CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+1774456180091:"CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+1774456180092:"COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+1774456180094:"COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+1774456180096:"DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+1774456180097:"FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+1774456180099:"FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+1774456180100:"GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+1774456180102:"ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+1774456180104:"LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+1774456180105:"MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+1774456180107:"NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+1774456180109:"PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+1774456180110:"PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+1774456180112:"SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+1774456180113:"SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+1774456180115:"THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+1774456180117:"TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+1774456180121:EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+1774456180123:EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+1774456180125:"CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+1774456180126:"MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+1774456180128:"TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+1774456180129:"SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+1774456180131:"TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+1774456180132:"S100A11P1","CDH15","PATJ","TSKU")
+1774456180135:EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+1774456180137:"TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+1774456180138:"CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+1774456180139:"OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+1774456180141:"SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+1774456180144:EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+1774456180145:"TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+1774456180146:"PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+1774456180148:"TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+1774456180149:"LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+1774456180150:"OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+1774456180152:"ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+1774456180153:"AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+1774456180154:"C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+1774456180156:"C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+1774456180157:"ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+1774456180158:"SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+1774456180160:"MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+1774456180161:"CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+1774456180162:"COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+1774456180166:EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+1774456180167:"LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+1774456180168:"SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+1774456180170:"COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+1774456180171:"RECK","TMEFF1","PTRF")
+1774456180174:EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+1774456180175:"CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+1774456180176:"KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+1774456180178:"KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+1774456180179:"EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+1774456180180:"DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+1774456180182:"CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+1774456180183:"OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+1774456180184:"EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+1774456180186:"ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+1774456180187:"PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+1774456180188:"PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+1774456180190:"FAM174B","PTPRF","SORD")
+1774456180193:EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+1774456180194:"VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+1774456180195:"IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+1774456180197:"RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+1774456180198:"SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+1774456180199:"MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+1774456180201:"COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+1774456180202:"SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+1774456180203:"COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+1774456180205:"VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+1774456180207:"CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+1774456180208:"CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+1774456180209:"NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+1774456180211:"PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+1774456180215:LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+1774456180218:exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+1774456326211:gsva_params <- gsvaParam(exprData = expr_matrix,
+1774456326214:geneSets = list(
+1774456326216:Fatty_acid_uptake.gsva = Fatty_acid_uptake,
+1774456326218:LOXs.gsva = LOXs,
+1774456326220:Iron_intake.gsva = Iron_intake,
+1774456326223:Iron_utilization.gsva = Iron_utilization,
+1774456326225:Glutathione.gsva = Glutathione,
+1774456326227:BH4.gsva = BH4,
+1774456326229:CoQ10.gsva = CoQ10
+1774456326231:))
+1774456331146:Heatmap.GSVA.scores <- gsva(gsva_params)
+1774456353411:class(expr_matrix)
+1774456383274:expr_matrix[1:6,1:6]
+1774456417506:tail(colnames(M.mx.l2.annotated))
+1774456439029:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg,-MPG)
+1774456449314:M.mx.l2 <- log2(M.mx+1)
+1774456451051:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774456453667:# Step 1: Extract rownames as column
+1774456453677:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774456453798:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774456453830:# Step 2: Inner join (only rows in M.mx.l2)
+1774456453832:M.mx.l2.annotated <- expr_df %>%
+1774456453834:inner_join(annot_df, by = "gene_id")
+1774456457329:# Step 3: Move gene_id back to rownames
+1774456457330:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774456457346:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774456457364:# Step 4: Report on join success
+1774456457366:cat("=== JOIN REPORT ===\n\n")
+1774456457367:cat("Rows in annot:              ", nrow(annot), "\n")
+1774456457369:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774456457371:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774456457372:# Check for unmatched
+1774456457373:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774456457444:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774456457485:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774456457487:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774456457488:# Success status
+1774456457489:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774456457490:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774456457491:} else {
+1774456457491:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774456457492:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774456457493:}
+1774456457495:# View result
+1774456457496:cat("\nFinal structure:\n")
+1774456457497:print(head(M.mx.l2.annotated[, 1:8]))
+1774456471558:M.mx.l2.annotated <- mutate(M.mx.l2.annotated, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2.annotated, ends_with("XX")), na.rm = TRUE)))
+1774456475465:mpg <- rep('No', nrow(M.mx.l2.annotated))
+1774456475516:for (i in unique(M.mx.l2.annotated[,"gene"])){
+1774456475519:if (is.na(i)){next}
+1774456475521:idxs <- which(M.mx.l2.annotated[,"gene"] == i)
+1774456475523:max_idx <- which(M.mx.l2.annotated$Avg[idxs] == max(M.mx.l2.annotated$Avg[idxs]))[1]
+1774456475528:mpg[idxs[max_idx]] <- 'Yes'
+1774456475530:}
+1774456481287:M.mx.l2.annotated$MPG <- mpg
+1774456485123:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg,-MPG)
+1774456489350:expr_matrix <- M.mx.l2.annotated %>%
+1774456489352:rownames_to_column("old_id") %>%
+1774456489354:dplyr::select(-old_id) %>%
+1774456489356:column_to_rownames("gene")
+1774456500026:expr_matrix[1:5,1:5]
+1774456526483:expr_matrix <- as.matrix(expr_matrix)
+1774456536810:class(expr_matrix)
+1774456539387:Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+1774456539389:"CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+1774456539391:"NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+1774456539451:"NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+1774456539453:"SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+1774456539455:"AIFM2","AKR1C3","FTMT","ATG5")
+1774456539459:Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+1774456539461:"STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+1774456539464:Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+1774456539467:Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+1774456539470:Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+1774456539471:"ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+1774456539473:"ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+1774456539474:"CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+1774456539476:"CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+1774456539477:"ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+1774456539479:"ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+1774456539480:"HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+1774456539482:"MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+1774456539483:"PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+1774456539487:Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+1774456539489:Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+1774456539491:"CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+1774456539492:"ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+1774456539493:"HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+1774456539495:"PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+1774456539496:"SCD5","SIRT1","TBXAS1")
+1774456539499:Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+1774456539500:"CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+1774456539502:"ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+1774456539503:"LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+1774456539504:"MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+1774456539506:"PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+1774456539507:"PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+1774456539508:"PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+1774456539510:"PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+1774456539511:"PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+1774456539514:Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+1774456539515:"CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+1774456539517:"DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+1774456539518:"GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+1774456539519:"OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+1774456539522:# Ferroptosis_pathways2
+1774456539523:Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+1774456539525:"NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+1774456539526:"NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+1774456539527:"NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+1774456539528:"NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+1774456539530:"UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+1774456539531:"COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+1774456539532:"COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+1774456539535:Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+1774456539537:"GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+1774456539538:"MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+1774456539539:"PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+1774456539540:"TXN","TXNRD1","TXNRD2")
+1774456539543:LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+1774456539546:BH4 <- c("GCH1","PTS","QDPR","SPR")
+1774456539548:Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+1774456539551:Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+1774456539552:"GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+1774456539553:"GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+1774456539556:CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+1774456539558:Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+1774456539561:Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+1774456539562:"SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+1774456539563:"SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+1774456539566:homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+1774456539569:Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+1774456539571:Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+1774456539572:"HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+1774456539574:"PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+1774456539576:Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+1774456539578:"MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+1774456539580:# EMT and Others
+1774456539582:EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+1774456539583:"DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+1774456539584:"CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+1774456539586:"ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+1774456539587:"APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+1774456539590:EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+1774456539591:"CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+1774456539592:"CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+1774456539594:"COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+1774456539595:"COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+1774456539596:"DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+1774456539598:"FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+1774456539599:"FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+1774456539600:"GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+1774456539602:"ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+1774456539603:"LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+1774456539604:"MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+1774456539606:"NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+1774456539607:"PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+1774456539608:"PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+1774456539610:"SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+1774456539611:"SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+1774456539613:"THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+1774456539614:"TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+1774456539617:EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+1774456539620:EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+1774456539621:"CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+1774456539623:"MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+1774456539624:"TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+1774456539625:"SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+1774456539626:"TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+1774456539628:"S100A11P1","CDH15","PATJ","TSKU")
+1774456539631:EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+1774456539632:"TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+1774456539633:"CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+1774456539634:"OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+1774456539636:"SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+1774456539639:EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+1774456539640:"TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+1774456539641:"PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+1774456539642:"TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+1774456539644:"LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+1774456539645:"OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+1774456539646:"ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+1774456539648:"AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+1774456539649:"C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+1774456539650:"C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+1774456539652:"ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+1774456539653:"SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+1774456539654:"MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+1774456539656:"CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+1774456539657:"COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+1774456539660:EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+1774456539662:"LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+1774456539663:"SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+1774456539664:"COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+1774456539665:"RECK","TMEFF1","PTRF")
+1774456539668:EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+1774456539669:"CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+1774456539671:"KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+1774456539672:"KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+1774456539673:"EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+1774456539675:"DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+1774456539676:"CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+1774456539677:"OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+1774456539678:"EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+1774456539680:"ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+1774456539681:"PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+1774456539683:"PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+1774456539684:"FAM174B","PTPRF","SORD")
+1774456539687:EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+1774456539688:"VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+1774456539690:"IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+1774456539691:"RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+1774456539692:"SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+1774456539694:"MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+1774456539695:"COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+1774456539696:"SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+1774456539698:"COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+1774456539699:"VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+1774456539700:"CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+1774456539702:"CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+1774456539703:"NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+1774456539704:"PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+1774456539708:LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+1774456539710:exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+1774456592814:gsva_params <- gsvaParam(exprData = expr_matrix,
+1774456592816:geneSets = list(
+1774456592818:Fatty_acid_uptake.gsva = Fatty_acid_uptake,
+1774456592820:LOXs.gsva = LOXs,
+1774456592822:Iron_intake.gsva = Iron_intake,
+1774456592823:Iron_utilization.gsva = Iron_utilization,
+1774456592825:Glutathione.gsva = Glutathione,
+1774456592827:BH4.gsva = BH4,
+1774456592828:CoQ10.gsva = CoQ10
+1774456592830:))
+1774456592873:Heatmap.GSVA.scores <- gsva(gsva_params)
+1774456699569:source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+1774456701528:KSScore.EMTSignature.file = "./EM_gene_signature_tumor_KS.xlsx"
+1774456796403:met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+1774456812079:KSScore.EMTSignature.file = "./EM_gene_signature_tumor_KS.xlsx"
+1774456814656:met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+1774456858555:met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+1774456862177:met500.ks.emt <- as.data.frame(met500.ks.emt)
+1774456872315:head(met500.ks.emt)
+1774456900559:ls()
+1774456912794:head(Heatmap.GSVA.scores)
+1774456919480:dim(Heatmap.GSVA.scores)
+1774457114264:# Remove genes with zero variance BEFORE scaling
+1774457114269:gene_sds <- apply(expr_matrix, 1, sd)
+1774457115285:expr_matrix.filtered <- expr_matrix[gene_sds > 0, ]
+1774457115349:cat("Genes removed (zero variance):", nrow(expr_matrix) - nrow(expr_matrix), "\n")
+1774457116222:cat("Genes remaining:", nrow(expr_matrix), "\n")
+1774457116224:# Now row-center
+1774457116225:expr_matrix.rc <- calculate_zscore(expr_matrix.filtered)
+1774457119325:# Verify - should have NO NaN
+1774457119326:print(sum(is.nan(expr_matrix.rc)))
+1774457161995:expr_matrix.rc.transposed <- t(expr_matrix.rc)
+1774457172569:expr_matrix.rc.transposed[1:5,1:5]
+1774457221472:head(met500.ks.emt)
+1774457244014:Heatmap.GSVA.scores[1:5,1:5]
+1774457291759:Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
+1774457299654:Heatmap.GSVA.scores.transposed[1:5,1:5]
+1774457306600:expr_matrix.rc.transposed[1:5,1:5]
+1774457327653:head(met500.ks.emt)
+1774457392726:class(met500.ks.emt)
+1774457440708:# Convert all to dataframes with rownames as column
+1774457440710:gsva_df <- as.data.frame(Heatmap.GSVA.scores.transposed) %>%
+1774457440712:rownames_to_column("Sample")
+1774457440768:expr_df <- as.data.frame(expr_matrix.rc.transposed) %>%
+1774457440770:rownames_to_column("Sample")
+1774457441388:met_df <- as.data.frame(met500.ks.emt) %>%
+1774457441389:rownames_to_column("Sample")
+1774457441393:# Join all three by Sample
+1774457441395:merged_all <- gsva_df %>%
+1774457441396:inner_join(expr_df, by = "Sample") %>%
+1774457441398:inner_join(met_df, by = "Sample")
+1774457441761:# Convert Sample back to rownames
+1774457441762:rownames(merged_all) <- merged_all$Sample
+1774457441774:merged_all <- merged_all %>% select(-Sample)
+1774457461645:# Convert all to dataframes with rownames as column
+1774457461647:gsva_df <- as.data.frame(Heatmap.GSVA.scores.transposed) %>%
+1774457461649:rownames_to_column("Sample")
+1774457461704:expr_df <- as.data.frame(expr_matrix.rc.transposed) %>%
+1774457461706:rownames_to_column("Sample")
+1774457462206:met_df <- as.data.frame(met500.ks.emt) %>%
+1774457462208:rownames_to_column("Sample")
+1774457462213:# Join all three by Sample
+1774457462215:merged_all <- gsva_df %>%
+1774457462217:inner_join(expr_df, by = "Sample") %>%
+1774457462218:inner_join(met_df, by = "Sample")
+1774457462672:# Convert Sample back to rownames
+1774457462673:rownames(merged_all) <- merged_all$Sample
+1774457462699:merged_all <- merged_all %>% dplyr::select(-Sample)
+1774457462770:# Report on join success
+1774457462771:cat("=== THREE-WAY JOIN REPORT ===\n\n")
+1774457462773:cat("Rows in GSVA scores:                  ", nrow(gsva_df), "\n")
+1774457462775:cat("Rows in expression matrix:            ", nrow(expr_df), "\n")
+1774457462777:cat("Rows in met500.ks.emt:                ", nrow(met_df), "\n")
+1774457462779:cat("Rows after inner_join:                ", nrow(merged_all), "\n\n")
+1774457462781:# Check for unmatched
+1774457462782:unmatched_gsva <- anti_join(gsva_df, expr_df, by = "Sample") %>%
+1774457462784:anti_join(met_df, by = "Sample")
+1774457462883:unmatched_expr <- anti_join(expr_df, gsva_df, by = "Sample") %>%
+1774457462885:anti_join(met_df, by = "Sample")
+1774457463025:unmatched_met <- anti_join(met_df, gsva_df, by = "Sample") %>%
+1774457463026:anti_join(expr_df, by = "Sample")
+1774457463088:cat("Samples in GSVA but NOT in others:    ", nrow(unmatched_gsva), "\n")
+1774457463090:cat("Samples in expr but NOT in others:    ", nrow(unmatched_expr), "\n")
+1774457463091:cat("Samples in met but NOT in others:     ", nrow(unmatched_met), "\n\n")
+1774457463092:# Success status
+1774457463093:if (nrow(merged_all) > 0) {
+1774457463094:cat("✓ SUCCESS: Join completed!\n")
+1774457463095:cat("  Final dimensions: ", nrow(merged_all), " samples × ", ncol(merged_all), " variables\n\n")
+1774457463096:} else {
+1774457463097:cat("✗ ERROR: No matching samples found!\n")
+1774457463098:}
+1774457463100:# View result
+1774457463101:cat("Final structure:\n")
+1774457463102:print(head(merged_all[, 1:8]))
+1774457716320:# Helper function to get correlation statistics
+1774457716323:get_cor_stats <- function(x, y) {
+1774457716325:# Remove NA values
+1774457716327:idx <- !is.na(x) & !is.na(y)
+1774457716329:x <- x[idx]
+1774457716331:y <- y[idx]
+1774457716335:# Calculate correlation
+1774457716337:cor_test <- cor.test(x, y, method = "pearson")
+1774457716339:r_squared <- cor_test$estimate^2
+1774457716341:p_value <- cor_test$p.value
+1774457716344:return(list(r_squared = r_squared, p_value = p_value))
+1774457716389:}
+1774457716392:# Plot 1: BH4.gsva
+1774457716394:stats1 <- get_cor_stats(merged_all$EMT_KS_Score, merged_all$BH4.gsva)
+1774457732004:head(merged_all$EMT_KS_Score)
+1774457752084:head(met500.ks.emt)
+1774457855669:# Helper function to get correlation statistics
+1774457855671:get_cor_stats <- function(x, y) {
+1774457855673:# Remove NA values
+1774457855675:idx <- !is.na(x) & !is.na(y)
+1774457855677:x <- x[idx]
+1774457855679:y <- y[idx]
+1774457855731:# Calculate correlation
+1774457855733:cor_test <- cor.test(x, y, method = "pearson")
+1774457855735:r_squared <- cor_test$estimate^2
+1774457855737:p_value <- cor_test$p.value
+1774457855741:return(list(r_squared = r_squared, p_value = p_value))
+1774457855742:}
+1774457855745:# Plot 1: BH4.gsva
+1774457855747:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774457855759:title1 <- sprintf("Scatterplot of EMT_KS_Score vs BH4.gsva - (RÂ² = %.2f, p = %.2e)",
+1774457855761:stats1$r_squared, stats1$p_value)
+1774457855764:ggplot(merged_all, aes(x = EMT_KS_Score, y = BH4.gsva)) +
+1774457855766:geom_point(color = "steelblue", size = 2) +
+1774457855767:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774457855769:labs(
+1774457855770:title = title1,
+1774457855772:x = "EMT_KS_Score",
+1774457855773:y = "BH4 gsva"
+1774457855775:) +
+1774457855776:theme_minimal()
+1774457897462:# Helper function to get correlation statistics
+1774457897465:get_cor_stats <- function(x, y) {
+1774457897467:# Remove NA values
+1774457897469:idx <- !is.na(x) & !is.na(y)
+1774457897471:x <- x[idx]
+1774457897473:y <- y[idx]
+1774457897476:# Calculate correlation
+1774457897478:cor_test <- cor.test(x, y, method = "pearson")
+1774457897482:r_squared <- cor_test$estimate^2
+1774457897483:p_value <- cor_test$p.value
+1774457897487:return(list(r_squared = r_squared, p_value = p_value))
+1774457897489:}
+1774457897492:# Plot 1: BH4.gsva
+1774457897494:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774457897543:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (RÂ² = %.2f, p = %.2e)",
+1774457897545:stats1$r_squared, stats1$p_value)
+1774457897548:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774457897549:geom_point(color = "steelblue", size = 2) +
+1774457897551:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774457897552:labs(
+1774457897554:title = title1,
+1774457897555:x = "EMT_KS_Score",
+1774457897557:y = "BH4 gsva"
+1774457897558:) +
+1774457897560:theme_minimal()
+1774457898219:# Plot 2: ACSL4
+1774457898222:stats2 <- get_cor_stats(merged_all$met500.ks.emt, ACSL4)
+1774458030386:head(expr_matrix.rc)
+1774458044860:expr_matrix.rc[1:5,1:5]
+1774458122955:class(expr_matrix.rc)
+1774458136810:expr_matrix.rc["ACSL4", ]
+1774458264730:# Helper function to get correlation statistics
+1774458264733:get_cor_stats <- function(x, y) {
+1774458264735:# Remove NA values
+1774458264737:idx <- !is.na(x) & !is.na(y)
+1774458264738:x <- x[idx]
+1774458264740:y <- y[idx]
+1774458264744:# Calculate correlation
+1774458264746:cor_test <- cor.test(x, y, method = "pearson")
+1774458264747:r_squared <- cor_test$estimate^2
+1774458264805:p_value <- cor_test$p.value
+1774458264810:return(list(r_squared = r_squared, p_value = p_value))
+1774458264812:}
+1774458264816:# Plot 1: BH4.gsva
+1774458264818:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774458264826:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (RÂ² = %.2f, p = %.2e)",
+1774458264828:stats1$r_squared, stats1$p_value)
+1774458264832:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774458264834:geom_point(color = "steelblue", size = 2) +
+1774458264835:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458264837:labs(
+1774458264839:title = title1,
+1774458264841:x = "EMT_KS_Score",
+1774458264843:y = "BH4 gsva"
+1774458264844:) +
+1774458264846:theme_minimal()
+1774458265279:# Plot 2: ACSL4
+1774458265281:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774458265301:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (RÂ² = %.2f, p = %.2e)",
+1774458265302:stats2$r_squared, stats2$p_value)
+1774458265306:ggplot(merged_all, aes(x = EMT_KS_Score, y = ACSL4)) +
+1774458265307:geom_point(color = "steelblue", size = 2) +
+1774458265309:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458265310:labs(
+1774458265311:title = title2,
+1774458265313:x = "EMT_KS_Score",
+1774458265314:y = "ACSL4 (Z-Score)"
+1774458265315:) +
+1774458265317:theme_minimal()
+1774458304255:# Helper function to get correlation statistics
+1774458304257:get_cor_stats <- function(x, y) {
+1774458304259:# Remove NA values
+1774458304261:idx <- !is.na(x) & !is.na(y)
+1774458304263:x <- x[idx]
+1774458304265:y <- y[idx]
+1774458304269:# Calculate correlation
+1774458304271:cor_test <- cor.test(x, y, method = "pearson")
+1774458304273:r_squared <- cor_test$estimate^2
+1774458304275:p_value <- cor_test$p.value
+1774458304326:return(list(r_squared = r_squared, p_value = p_value))
+1774458304328:}
+1774458304331:# Plot 1: BH4.gsva
+1774458304333:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774458304340:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (RÂ² = %.2f, p = %.2e)",
+1774458304341:stats1$r_squared, stats1$p_value)
+1774458304344:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774458304346:geom_point(color = "steelblue", size = 2) +
+1774458304348:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458304349:labs(
+1774458304351:title = title1,
+1774458304352:x = "EMT_KS_Score",
+1774458304354:y = "BH4 gsva"
+1774458304355:) +
+1774458304357:theme_minimal()
+1774458304716:# Plot 2: ACSL4
+1774458304718:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774458304742:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (RÂ² = %.2f, p = %.2e)",
+1774458304743:stats2$r_squared, stats2$p_value)
+1774458304747:ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+1774458304748:geom_point(color = "steelblue", size = 2) +
+1774458304750:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458304751:labs(
+1774458304752:title = title2,
+1774458304754:x = "EMT_KS_Score",
+1774458304755:y = "ACSL4 (Z-Score)"
+1774458304757:) +
+1774458304758:theme_minimal()
+1774458305222:# Plot 3: GCH1
+1774458305224:stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+1774458305231:title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (RÂ² = %.2f, p = %.2e)",
+1774458305233:stats3$r_squared, stats3$p_value)
+1774458305236:ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+1774458305238:geom_point(color = "steelblue", size = 2) +
+1774458305239:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458305240:labs(
+1774458305242:title = title3,
+1774458305243:x = "EMT_KS_Score",
+1774458305244:y = "GCH1 (Z-Score)"
+1774458305246:) +
+1774458305247:theme_minimal()
+1774458346794:# Helper function to get correlation statistics
+1774458346797:get_cor_stats <- function(x, y) {
+1774458346799:# Remove NA values
+1774458346801:idx <- !is.na(x) & !is.na(y)
+1774458346803:x <- x[idx]
+1774458346853:y <- y[idx]
+1774458346856:# Calculate correlation
+1774458346858:cor_test <- cor.test(x, y, method = "pearson")
+1774458346860:r_squared <- cor_test$estimate^2
+1774458346862:p_value <- cor_test$p.value
+1774458346865:return(list(r_squared = r_squared, p_value = p_value))
+1774458346867:}
+1774458346870:# Plot 1: BH4.gsva
+1774458346871:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774458346878:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (RÂ² = %.2f, p = %.2e)",
+1774458346879:stats1$r_squared, stats1$p_value)
+1774458346882:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774458346884:geom_point(color = "steelblue", size = 2) +
+1774458346885:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458346887:labs(
+1774458346888:title = title1,
+1774458346889:x = "met500.ks.emt",
+1774458346891:y = "BH4 gsva"
+1774458346892:) +
+1774458346894:theme_minimal()
+1774458347258:# Plot 2: ACSL4
+1774458347260:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774458347284:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (RÂ² = %.2f, p = %.2e)",
+1774458347286:stats2$r_squared, stats2$p_value)
+1774458347289:ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+1774458347291:geom_point(color = "steelblue", size = 2) +
+1774458347292:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458347293:labs(
+1774458347295:title = title2,
+1774458347296:x = "met500.ks.emt",
+1774458347297:y = "ACSL4 (Z-Score)"
+1774458347299:) +
+1774458347300:theme_minimal()
+1774458347776:# Plot 3: GCH1
+1774458347780:stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+1774458347796:title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (RÂ² = %.2f, p = %.2e)",
+1774458347800:stats3$r_squared, stats3$p_value)
+1774458347808:ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+1774458347811:geom_point(color = "steelblue", size = 2) +
+1774458347813:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774458347815:labs(
+1774458347818:title = title3,
+1774458347820:x = "met500.ks.emt",
+1774458347822:y = "GCH1 (Z-Score)"
+1774458347824:) +
+1774458347826:theme_minimal()
+1774461153734:# Helper function to get correlation statistics
+1774461153737:get_cor_stats <- function(x, y) {
+1774461153738:# Remove NA values
+1774461153740:idx <- !is.na(x) & !is.na(y)
+1774461153742:x <- x[idx]
+1774461153744:y <- y[idx]
+1774461153747:# Calculate correlation
+1774461153749:cor_test <- cor.test(x, y, method = "pearson")
+1774461153750:r_squared <- cor_test$estimate^2
+1774461153752:p_value <- cor_test$p.value
+1774461153755:return(list(r_squared = r_squared, p_value = p_value))
+1774461153757:}
+1774461153760:# Plot 1: BH4.gsva
+1774461153762:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774461153768:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (R² = %.2f, p = %.2e)",
+1774461153770:stats1$r_squared, stats1$p_value)
+1774461153773:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774461153775:geom_point(color = "steelblue", size = 2) +
+1774461153776:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774461153778:labs(
+1774461153779:title = title1,
+1774461153781:x = "met500.ks.emt",
+1774461153782:y = "BH4 gsva"
+1774461153783:) +
+1774461153785:theme_minimal()
+1774461154153:# Plot 2: ACSL4
+1774461154156:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774461154180:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (R² = %.2f, p = %.2e)",
+1774461154181:stats2$r_squared, stats2$p_value)
+1774461154185:ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+1774461154186:geom_point(color = "steelblue", size = 2) +
+1774461154188:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774461154189:labs(
+1774461154190:title = title2,
+1774461154192:x = "met500.ks.emt",
+1774461154193:y = "ACSL4 (Z-Score)"
+1774461154194:) +
+1774461154196:theme_minimal()
+1774461154715:# Plot 3: GCH1
+1774461154717:stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+1774461154721:title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (R² = %.2f, p = %.2e)",
+1774461154722:stats3$r_squared, stats3$p_value)
+1774461154724:ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+1774461154725:geom_point(color = "steelblue", size = 2) +
+1774461154726:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774461154727:labs(
+1774461154728:title = title3,
+1774461154729:x = "met500.ks.emt",
+1774461154730:y = "GCH1 (Z-Score)"
+1774461154731:) +
+1774461154732:theme_minimal()
+1774461315497:heat.data <- merged_all %>%
+1774461315499:dplyr::select(all_of(c("Sample","EMT_KS_Score","Fatty_acid_uptake.gsva",
+1774461315502:"LOXs.gsva", "Iron_intake.gsva",
+1774461315505:"Iron_utilization.gsva", "Glutathione.gsva",
+1774461315507:"BH4.gsva", "CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774461335678:heat.data <- merged_all %>%
+1774461335680:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774461335683:"LOXs.gsva", "Iron_intake.gsva",
+1774461335685:"Iron_utilization.gsva", "Glutathione.gsva",
+1774461335687:"BH4.gsva", "CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774461349284:merged_all[1:3]
+1774461354380:merged_all[1:3,1:3]
+1774461405195:class(merged_all    )
+1774461461130:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774461461229:heat.data <- merged_all.df %>%
+1774461461232:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774461461234:"LOXs.gsva", "Iron_intake.gsva",
+1774461461236:"Iron_utilization.gsva", "Glutathione.gsva",
+1774461461238:"BH4.gsva", "CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774461502804:# Sort by EMT_KS_Score
+1774461502807:heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+1774461502826:# Define genes in order
+1774461502828:genes_to_plot <- c("met500.ks.emt",
+1774461502869:"Fatty_acid_uptake.gsva", "LOXs.gsva", "Iron_intake.gsva",
+1774461502871:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva",
+1774461502873:"CoQ10.gsva",
+1774461502874:"ACSL4", "AGPS", "FAR1", "GCH1")
+1774461502878:# Create matrix
+1774461502879:heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+1774461502884:heatmap_data <- t(heatmap_data)
+1774461502889:# Define groups
+1774461502891:group_vec <- c(
+1774461502892:"SortOrder",
+1774461502893:"Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion",
+1774461502895:"Ferroptosis promotion", "Ferroptosis suppression", "Ferroptosis suppression",
+1774461502896:"Ferroptosis suppression", "Gene", "Gene", "Gene", "Gene"
+1774461502898:)
+1774461502901:# Create row split factor for spacing
+1774461502902:row_split <- factor(group_vec,
+1774461502903:levels = c("SortOrder", "Ferroptosis promotion",
+1774461502905:"Ferroptosis suppression", "Gene"))
+1774461502908:# Create color functions
+1774461502909:ferroptosis_data <- heatmap_data[2:8, ]
+1774461502913:gene_data <- heatmap_data[9:12, ]
+1774461502917:sortorder_data <- heatmap_data[1, ]
+1774461502921:# Ferroptosis color scale
+1774461502922:ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)),
+1774461502923:c("blue", "white", "red"))
+1774461502975:# Gene color scale: white to dark purple, with 75th percentile as cutoff
+1774461502977:# gene_75_percentile <- quantile(gene_data, 0.75)
+1774461502978:gene_cols <- colorRamp2(c(min(gene_data), 0, max(gene_data)), c("blue", "white", "red"))
+1774461502983:# SortOrder color scale: orange to green
+1774461502985:sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)),
+1774461502986:c("darkorange", "lightgreen"))
+1774461502990:# Step 6: Create heatmap WITH left annotation for group bars
+1774461502991:ht <- Heatmap(heatmap_data,
+1774461502993:cluster_rows = FALSE,
+1774461502994:cluster_columns = FALSE,
+1774461502996:row_split = row_split,
+1774461502997:row_gap = unit(3, "mm"),
+1774461502998:row_names_side = "right",
+1774461503000:show_column_names = FALSE,
+1774461503001:show_heatmap_legend = FALSE,
+1774461503003:left_annotation = rowAnnotation(
+1774461503004:Group = group_vec,
+1774461503005:col = list(Group = c("SortOrder" = "darkgreen",
+1774461503007:"Ferroptosis promotion" = "steelblue",
+1774461503008:"Ferroptosis suppression" = "coral",
+1774461503010:"Gene" = "brown")),
+1774461503011:show_legend = FALSE,
+1774461503012:simple_anno_size = unit(0.8, "cm"),
+1774461503014:gp = gpar(fontsize = 9)
+1774461503015:),
+1774461503017:cell_fun = function(j, i, x, y, w, h, fill) {
+1774461503018:if(i == 1) {
+1774461503020:# SortOrder row
+1774461503021:fill_color <- sortorder_cols(heatmap_data[i, j])
+1774461503022:} else if(i <= 8) {
+1774461503024:# Ferroptosis rows
+1774461503025:fill_color <- ferroptosis_cols(heatmap_data[i, j])
+1774461503027:} else {
+1774461503028:# Gene rows
+1774461503030:fill_color <- gene_cols(heatmap_data[i, j])
+1774461503031:}
+1774461503033:grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+1774461503034:},
+1774461503035:rect_gp = gpar(type = "none"),
+1774461503038:name = "Value",
+1774461503040:width = ncol(heatmap_data)*unit(0.3, "mm"),
+1774461503041:height = nrow(heatmap_data)*unit(9, "mm"))
+1774461503535:# Create separate legends
+1774461503538:group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion",
+1774461503541:"Ferroptosis suppression", "Gene"),
+1774461503544:labels = c("SortOrder", "Ferroptosis promotion",
+1774461503546:"Ferroptosis suppression", "Gene"),
+1774461503549:legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral", "brown")),
+1774461503552:title = "Group Category")
+1774461503676:gene_legend <- Legend(col_fun = gene_cols,
+1774461503678:title = "Gene Expression\nZ-Score",
+1774461503679:direction = "vertical")
+1774461504710:ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+1774461504711:title = "GSVA Scores",
+1774461504712:direction = "vertical")
+1774461505766:sortorder_legend <- Legend(col_fun = sortorder_cols,
+1774461505767:title = "Sort Order\n(EMT_KS_Score)",
+1774461505768:direction = "vertical")
+1774461506824:# Step 8: Draw with legends
+1774461506825:pdf("heatmap.pdf", width = 22, height = 7)
+1774461506828:draw(ht,
+1774461506829:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774461506830:annotation_legend_side = "right",
+1774461506831:padding = unit(c(1, 1, 1, 1), "cm"))
+1774461520850:dev.off()
+1774461520865:# Or view in RStudio
+1774461520867:draw(ht,
+1774461520868:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774461520869:annotation_legend_side = "right",
+1774461520870:padding = unit(c(1, 1, 1, 1), "cm"))
+1774461608353:sessionInfo()
+1774461609799:writeLines(capture.output(sessionInfo()), "01_TCGA_dataImport_sessionInfo.txt")
+1774461620005:sessionInfo()
+1774461620195:writeLines(capture.output(sessionInfo()), "01_MET500_dataImport_sessionInfo.txt")
+1774552515897:knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+1774552515915:dev="png", message=FALSE, error=FALSE, warning=TRUE)
+1774552519769:library(openxlsx)
+1774552520028:library(tidyverse)
+1774552521331:library(ggrepel)
+1774552521343:library(ggpubr)
+1774552521410:library(XML)
+1774552521514:library(reprex)
+1774552521664:library(matrixStats)
+1774552521680:library(readxl)
+1774552521692:library(Seurat)
+1774552524707:library(SeuratWrappers)
+1774552524780:#library(Azimuth)
+1774552524781:library(patchwork)
+1774552524788:library(sctransform)
+1774552524795:library(celldex)
+1774552532293:library(SingleR)
+1774552532507:library(rtracklayer)
+1774552533751:library(apeglm)
+1774552533996:library(ComplexHeatmap)
+1774552535082:library(gprofiler2)
+1774552535093:library(cluster)
+1774552535101:library(fgsea)
+1774552535121:library(SingleCellExperiment)
+1774552535425:library(VAM)
+1774552535458:library(UCell)
+1774552535476:library(GSVA)
+1774552537124:library(GSEABase)
+1774552537169:library(ComplexHeatmap)
+1774552537170:library(circlize)
+1774552537181:library(grid)
+1774552537182:#library(SoupX)
+1774552537183:#library(DoubletFinder)
+1774552548124:source('Rcode/data_formatting_tools.R')
+1774552548143:source('Rcode/analysis_tools.R')
+1774552548287:source('Rcode/plots.R')
+1774552548341:source('Rcode/common.R')
+1774552548368:source('Rcode/ssGSEA.Library.R')
+1774552551160:meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+1774552552707:M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+1774552607580:# M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+1774552607581:M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+1774552629523:M.mx.l2 <- log2(M.mx+1)
+1774552632253:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774552635114:# Step 1: Extract rownames as column
+1774552635117:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774552635267:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774552635304:# Step 2: Inner join (only rows in M.mx.l2)
+1774552635306:M.mx.l2.annotated <- expr_df %>%
+1774552635308:inner_join(annot_df, by = "gene_id")
+1774552635449:# Step 3: Move gene_id back to rownames
+1774552635451:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774552635471:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774552635494:# Step 4: Report on join success
+1774552635499:cat("=== JOIN REPORT ===\n\n")
+1774552635501:cat("Rows in annot:              ", nrow(annot), "\n")
+1774552635504:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774552635506:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774552635509:# Check for unmatched
+1774552635511:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774552635654:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774552635742:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774552635744:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774552635746:# Success status
+1774552635748:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774552635750:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774552635751:} else {
+1774552635752:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774552635754:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774552635755:}
+1774552635761:# View result
+1774552635763:cat("\nFinal structure:\n")
+1774552635764:print(head(M.mx.l2.annotated[, 1:8]))
+1774552641233:M.mx.l2.annotated <- mutate(M.mx.l2.annotated, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2.annotated, ends_with("XX")), na.rm = TRUE)))
+1774552644856:mpg <- rep('No', nrow(M.mx.l2.annotated))
+1774552644862:for (i in unique(M.mx.l2.annotated[,"gene"])){
+1774552644865:if (is.na(i)){next}
+1774552644867:idxs <- which(M.mx.l2.annotated[,"gene"] == i)
+1774552644869:max_idx <- which(M.mx.l2.annotated$Avg[idxs] == max(M.mx.l2.annotated$Avg[idxs]))[1]
+1774552644873:mpg[idxs[max_idx]] <- 'Yes'
+1774552644875:}
+1774552650571:M.mx.l2.annotated$MPG <- mpg
+1774552650610:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg,-MPG)
+1774552650713:expr_matrix <- M.mx.l2.annotated %>%
+1774552650798:rownames_to_column("old_id") %>%
+1774552650799:dplyr::select(-old_id) %>%
+1774552650800:column_to_rownames("gene")
+1774552650815:expr_matrix <- as.matrix(expr_matrix)
+1774552656009:# Remove genes with zero variance BEFORE scaling
+1774552656012:gene_sds <- apply(expr_matrix, 1, sd)
+1774552658017:expr_matrix.filtered <- expr_matrix[gene_sds > 0, ]
+1774552658083:cat("Genes removed (zero variance):", nrow(expr_matrix) - nrow(expr_matrix), "\n")
+1774552658346:cat("Genes remaining:", nrow(expr_matrix), "\n")
+1774552658348:# Now row-center
+1774552658349:expr_matrix.rc <- calculate_zscore(expr_matrix.filtered)
+1774552662424:# Verify - should have NO NaN
+1774552662425:print(sum(is.nan(expr_matrix.rc)))
+1774552670654:expr_matrix.rc.transposed <- t(expr_matrix.rc)
+1774552674021:Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+1774552674023:"CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+1774552674026:"NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+1774552674028:"NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+1774552674031:"SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+1774552674033:"AIFM2","AKR1C3","FTMT","ATG5")
+1774552674038:Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+1774552674041:"STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+1774552674087:Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+1774552674092:Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+1774552674096:Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+1774552674099:"ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+1774552674101:"ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+1774552674103:"CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+1774552674106:"CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+1774552674108:"ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+1774552674110:"ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+1774552674112:"HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+1774552674114:"MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+1774552674116:"PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+1774552674121:Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+1774552674125:Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+1774552674127:"CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+1774552674129:"ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+1774552674131:"HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+1774552674133:"PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+1774552674135:"SCD5","SIRT1","TBXAS1")
+1774552674139:Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+1774552674141:"CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+1774552674143:"ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+1774552674145:"LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+1774552674147:"MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+1774552674149:"PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+1774552674210:"PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+1774552674212:"PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+1774552674215:"PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+1774552674217:"PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+1774552674223:Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+1774552674225:"CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+1774552674227:"DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+1774552674230:"GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+1774552674232:"OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+1774552674237:# Ferroptosis_pathways2
+1774552674239:Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+1774552674241:"NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+1774552674243:"NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+1774552674245:"NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+1774552674247:"NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+1774552674249:"UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+1774552674251:"COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+1774552674253:"COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+1774552674258:Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+1774552674260:"GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+1774552674262:"MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+1774552674264:"PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+1774552674266:"TXN","TXNRD1","TXNRD2")
+1774552674270:LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+1774552674274:BH4 <- c("GCH1","PTS","QDPR","SPR")
+1774552674278:Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+1774552674282:Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+1774552674284:"GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+1774552674286:"GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+1774552674290:CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+1774552674294:Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+1774552674298:Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+1774552674300:"SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+1774552674302:"SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+1774552674306:homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+1774552674309:Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+1774552674313:Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+1774552674315:"HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+1774552674334:"PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+1774552674339:Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+1774552674341:"MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+1774552674346:# EMT and Others
+1774552674349:EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+1774552674351:"DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+1774552674356:"CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+1774552674358:"ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+1774552674360:"APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+1774552674365:EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+1774552674368:"CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+1774552674370:"CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+1774552674372:"COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+1774552674374:"COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+1774552674377:"DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+1774552674379:"FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+1774552674382:"FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+1774552674385:"GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+1774552674387:"ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+1774552674389:"LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+1774552674391:"MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+1774552674394:"NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+1774552674396:"PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+1774552674398:"PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+1774552674400:"SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+1774552674402:"SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+1774552674405:"THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+1774552674407:"TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+1774552674412:EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+1774552674416:EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+1774552674418:"CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+1774552674420:"MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+1774552674422:"TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+1774552674424:"SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+1774552674426:"TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+1774552674428:"S100A11P1","CDH15","PATJ","TSKU")
+1774552674432:EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+1774552674434:"TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+1774552674436:"CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+1774552674438:"OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+1774552674440:"SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+1774552674444:EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+1774552674446:"TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+1774552674447:"PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+1774552674476:"TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+1774552674478:"LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+1774552674480:"OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+1774552674482:"ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+1774552674484:"AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+1774552674486:"C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+1774552674488:"C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+1774552674490:"ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+1774552674492:"SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+1774552674494:"MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+1774552674496:"CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+1774552674498:"COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+1774552674502:EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+1774552674504:"LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+1774552674506:"SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+1774552674507:"COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+1774552674509:"RECK","TMEFF1","PTRF")
+1774552674513:EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+1774552674514:"CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+1774552674516:"KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+1774552674518:"KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+1774552674519:"EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+1774552674521:"DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+1774552674523:"CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+1774552674524:"OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+1774552674526:"EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+1774552674527:"ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+1774552674529:"PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+1774552674531:"PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+1774552674532:"FAM174B","PTPRF","SORD")
+1774552674536:EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+1774552674538:"VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+1774552674540:"IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+1774552674541:"RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+1774552674543:"SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+1774552674545:"MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+1774552674546:"COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+1774552674548:"SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+1774552674549:"COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+1774552674551:"VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+1774552674553:"CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+1774552674555:"CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+1774552674557:"NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+1774552674558:"PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+1774552674562:LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+1774552674566:exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+1774552749126:gsva_params <- gsvaParam(exprData = expr_matrix,
+1774552749129:geneSets = list(
+1774552749132:Fatty_acid_uptake.gsva = Fatty_acid_uptake,
+1774552749134:LOXs.gsva = LOXs,
+1774552749137:Thioredoxin.gsva = Thioredoxin,
+1774552749140:Glutamate_transmembrane.gsva = Glutamate_transmembrane,
+1774552749143:Membrane_Lipid.gsva = Membrane_Lipid,
+1774552749145:Unsat_FA_biosynth_process.gsva = Unsaturated_FA_biosynthetic_process,
+1774552749192:Fatty_acid.gsva = Fatty_acid,
+1774552749194:Iron_intake.gsva = Iron_intake,
+1774552749197:Iron_utilization.gsva = Iron_utilization,
+1774552749199:Glutathione.gsva = Glutathione,
+1774552749202:BH4.gsva = BH4,
+1774552749204:CoQ10.gsva = CoQ10
+1774552749207:))
+1774552749324:Heatmap.GSVA.scores <- gsva(gsva_params)
+1774552760844:Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
+1774552763572:source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+1774552766147:KSScore.EMTSignature.file = "./EM_gene_signature_tumor_KS.xlsx"
+1774552767899:met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+1774552771366:met500.ks.emt <- as.data.frame(met500.ks.emt)
+1774552779620:# Convert all to dataframes with rownames as column
+1774552779623:gsva_df <- as.data.frame(Heatmap.GSVA.scores.transposed) %>%
+1774552779626:rownames_to_column("Sample")
+1774552779710:expr_df <- as.data.frame(expr_matrix.rc.transposed) %>%
+1774552779713:rownames_to_column("Sample")
+1774552780275:met_df <- as.data.frame(met500.ks.emt) %>%
+1774552780277:rownames_to_column("Sample")
+1774552780282:# Join all three by Sample
+1774552780287:merged_all <- gsva_df %>%
+1774552780288:inner_join(expr_df, by = "Sample") %>%
+1774552780290:inner_join(met_df, by = "Sample")
+1774552780674:# Convert Sample back to rownames
+1774552780675:rownames(merged_all) <- merged_all$Sample
+1774552780685:merged_all <- merged_all %>% dplyr::select(-Sample)
+1774552780737:# Report on join success
+1774552780739:cat("=== THREE-WAY JOIN REPORT ===\n\n")
+1774552780740:cat("Rows in GSVA scores:                  ", nrow(gsva_df), "\n")
+1774552780741:cat("Rows in expression matrix:            ", nrow(expr_df), "\n")
+1774552780743:cat("Rows in met500.ks.emt:                ", nrow(met_df), "\n")
+1774552780744:cat("Rows after inner_join:                ", nrow(merged_all), "\n\n")
+1774552780746:# Check for unmatched
+1774552780747:unmatched_gsva <- anti_join(gsva_df, expr_df, by = "Sample") %>%
+1774552780748:anti_join(met_df, by = "Sample")
+1774552780816:unmatched_expr <- anti_join(expr_df, gsva_df, by = "Sample") %>%
+1774552780818:anti_join(met_df, by = "Sample")
+1774552780939:unmatched_met <- anti_join(met_df, gsva_df, by = "Sample") %>%
+1774552780940:anti_join(expr_df, by = "Sample")
+1774552781006:cat("Samples in GSVA but NOT in others:    ", nrow(unmatched_gsva), "\n")
+1774552781008:cat("Samples in expr but NOT in others:    ", nrow(unmatched_expr), "\n")
+1774552781009:cat("Samples in met but NOT in others:     ", nrow(unmatched_met), "\n\n")
+1774552781011:# Success status
+1774552781012:if (nrow(merged_all) > 0) {
+1774552781013:cat("✓ SUCCESS: Join completed!\n")
+1774552781014:cat("  Final dimensions: ", nrow(merged_all), " samples × ", ncol(merged_all), " variables\n\n")
+1774552781015:} else {
+1774552781015:cat("✗ ERROR: No matching samples found!\n")
+1774552781016:}
+1774552781019:# View result
+1774552781020:cat("Final structure:\n")
+1774552781021:print(head(merged_all[, 1:8]))
+1774552789778:# Helper function to get correlation statistics
+1774552789781:get_cor_stats <- function(x, y) {
+1774552789784:# Remove NA values
+1774552789787:idx <- !is.na(x) & !is.na(y)
+1774552789789:x <- x[idx]
+1774552789792:y <- y[idx]
+1774552789855:# Calculate correlation
+1774552789858:cor_test <- cor.test(x, y, method = "pearson")
+1774552789860:r_squared <- cor_test$estimate^2
+1774552789863:p_value <- cor_test$p.value
+1774552789868:return(list(r_squared = r_squared, p_value = p_value))
+1774552789870:}
+1774552789874:# Plot 1: BH4.gsva
+1774552789877:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774552789887:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (R² = %.2f, p = %.2e)",
+1774552789889:stats1$r_squared, stats1$p_value)
+1774552789894:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774552789898:geom_point(color = "steelblue", size = 2) +
+1774552789900:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774552789903:labs(
+1774552789905:title = title1,
+1774552789907:x = "met500.ks.emt",
+1774552789910:y = "BH4 gsva"
+1774552789912:) +
+1774552789914:theme_minimal()
+1774552790703:# Plot 2: ACSL4
+1774552790706:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774552790730:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (R² = %.2f, p = %.2e)",
+1774552790732:stats2$r_squared, stats2$p_value)
+1774552790736:ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+1774552790738:geom_point(color = "steelblue", size = 2) +
+1774552790740:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774552790742:labs(
+1774552790743:title = title2,
+1774552790745:x = "met500.ks.emt",
+1774552790747:y = "ACSL4 (Z-Score)"
+1774552790748:) +
+1774552790750:theme_minimal()
+1774552791279:# Plot 3: GCH1
+1774552791282:stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+1774552791290:title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (R² = %.2f, p = %.2e)",
+1774552791292:stats3$r_squared, stats3$p_value)
+1774552791296:ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+1774552791300:geom_point(color = "steelblue", size = 2) +
+1774552791302:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774552791304:labs(
+1774552791306:title = title3,
+1774552791307:x = "met500.ks.emt",
+1774552791309:y = "GCH1 (Z-Score)"
+1774552791311:) +
+1774552791312:theme_minimal()
+1774552888106:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774552888204:heat.data <- joined_df.plusKS %>%
+1774552888206:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774552888208:"LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774552888210:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774552888212:"CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774552921745:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774552921853:heat.data <- merged_all.df %>%
+1774552921855:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774552921858:"LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774552921860:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774552921863:"CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774552983532:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774552983585:heat.data <- merged_all.df %>%
+1774552983587:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774552983589:"LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774552983591:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774552983593:"CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774552986378:# Sort by EMT_KS_Score
+1774552986381:heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+1774552986464:# Define genes in order
+1774552986466:genes_to_plot <- c("met500.ks.emt",
+1774552986468:"Fatty_acid_uptake.gsva", "LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774552986470:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva","Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774552986472:"CoQ10.gsva",
+1774552986474:"ACSL4", "AGPS", "FAR1", "GCH1")
+1774552986478:# Create matrix
+1774552986480:heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+1774552986486:heatmap_data <- t(heatmap_data)
+1774552986493:# Define groups
+1774552986494:group_vec <- c(
+1774552986496:"SortOrder",
+1774552986498:"Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion",
+1774552986502:"Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression",
+1774552986504:"Gene", "Gene", "Gene", "Gene"
+1774552986506:)
+1774552986510:# Create row split factor for spacing
+1774552986512:row_split <- factor(group_vec,
+1774552986514:levels = c("SortOrder", "Ferroptosis promotion",
+1774552986516:"Ferroptosis suppression", "Gene"))
+1774552986519:# Create color functions
+1774552986521:ferroptosis_data <- heatmap_data[2:8, ]
+1774552986527:gene_data <- heatmap_data[9:12, ]
+1774552986533:sortorder_data <- heatmap_data[1, ]
+1774552986537:# Ferroptosis color scale
+1774552986539:ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)),
+1774552986541:c("blue", "white", "red"))
+1774552986555:# Gene color scale: white to dark purple, with 75th percentile as cutoff
+1774552986557:# gene_75_percentile <- quantile(gene_data, 0.75)
+1774552986558:gene_cols <- colorRamp2(c(min(gene_data), 0, max(gene_data)), c("blue", "white", "red"))
+1774552986565:# SortOrder color scale: orange to green
+1774552986567:sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)),
+1774552986568:c("darkorange", "lightgreen"))
+1774552986573:# Step 6: Create heatmap WITH left annotation for group bars
+1774552986575:ht <- Heatmap(heatmap_data,
+1774552986577:cluster_rows = FALSE,
+1774552986579:cluster_columns = FALSE,
+1774552986580:row_split = row_split,
+1774552986582:row_gap = unit(3, "mm"),
+1774552986584:row_names_side = "right",
+1774552986586:show_column_names = FALSE,
+1774552986587:show_heatmap_legend = FALSE,
+1774552986589:left_annotation = rowAnnotation(
+1774552986591:Group = group_vec,
+1774552986592:col = list(Group = c("SortOrder" = "darkgreen",
+1774552986594:"Ferroptosis promotion" = "steelblue",
+1774552986596:"Ferroptosis suppression" = "coral",
+1774552986598:"Gene" = "brown")),
+1774552986599:show_legend = FALSE,
+1774552986601:simple_anno_size = unit(0.8, "cm"),
+1774552986603:gp = gpar(fontsize = 9)
+1774552986605:),
+1774552986606:cell_fun = function(j, i, x, y, w, h, fill) {
+1774552986608:if(i == 1) {
+1774552986610:# SortOrder row
+1774552986611:fill_color <- sortorder_cols(heatmap_data[i, j])
+1774552986613:} else if(i <= 8) {
+1774552986615:# Ferroptosis rows
+1774552986617:fill_color <- ferroptosis_cols(heatmap_data[i, j])
+1774552986619:} else {
+1774552986621:# Gene rows
+1774552986623:fill_color <- gene_cols(heatmap_data[i, j])
+1774552986625:}
+1774552986627:grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+1774552986629:},
+1774552986631:rect_gp = gpar(type = "none"),
+1774552986632:name = "Value",
+1774552986634:width = ncol(heatmap_data)*unit(0.3, "mm"),
+1774552986636:height = nrow(heatmap_data)*unit(9, "mm"))
+1774552986817:# Create separate legends
+1774552986819:group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion",
+1774552986821:"Ferroptosis suppression", "Gene"),
+1774552986823:labels = c("SortOrder", "Ferroptosis promotion",
+1774552986825:"Ferroptosis suppression", "Gene"),
+1774552986826:legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral", "brown")),
+1774552986828:title = "Group Category")
+1774552986957:gene_legend <- Legend(col_fun = gene_cols,
+1774552986959:title = "Gene Expression\nZ-Score",
+1774552986961:direction = "vertical")
+1774552988009:ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+1774552988011:title = "GSVA Scores",
+1774552988012:direction = "vertical")
+1774552989057:sortorder_legend <- Legend(col_fun = sortorder_cols,
+1774552989058:title = "Sort Order\n(EMT_KS_Score)",
+1774552989059:direction = "vertical")
+1774552990154:# Step 8: Draw with legends
+1774552990156:pdf("heatmap.pdf", width = 22, height = 7)
+1774552990159:draw(ht,
+1774552990161:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774552990163:annotation_legend_side = "right",
+1774552990164:padding = unit(c(1, 1, 1, 1), "cm"))
+1774553008218:dev.off()
+1774553008238:# Or view in RStudio
+1774553008239:draw(ht,
+1774553008240:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774553008241:annotation_legend_side = "right",
+1774553008242:padding = unit(c(1, 1, 1, 1), "cm"))
+1774553134706:sessionInfo()
+1774553134910:writeLines(capture.output(sessionInfo()), "01_MET500_dataImport_sessionInfo.txt")
+1774780132684:knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+1774780132696:dev="png", message=FALSE, error=FALSE, warning=TRUE)
+1774780135770:library(openxlsx)
+1774780135976:library(tidyverse)
+1774780137336:library(ggrepel)
+1774780137360:library(ggpubr)
+1774780137468:library(XML)
+1774780137611:library(reprex)
+1774780137735:library(matrixStats)
+1774780137749:library(readxl)
+1774780137770:library(Seurat)
+1774780141845:library(SeuratWrappers)
+1774780141925:#library(Azimuth)
+1774780141926:library(patchwork)
+1774780141939:library(sctransform)
+1774780141952:library(celldex)
+1774780151441:library(SingleR)
+1774780151778:library(rtracklayer)
+1774780154703:library(apeglm)
+1774780155029:library(ComplexHeatmap)
+1774780155391:library(gprofiler2)
+1774780155407:library(cluster)
+1774780155420:library(fgsea)
+1774780155448:library(SingleCellExperiment)
+1774780155784:library(VAM)
+1774780155857:library(UCell)
+1774780155893:library(GSVA)
+1774780156736:library(GSEABase)
+1774780156843:library(ComplexHeatmap)
+1774780156844:library(circlize)
+1774780156875:library(grid)
+1774780156877:#library(SoupX)
+1774780156878:#library(DoubletFinder)
+1774781510813:source('Rcode/data_formatting_tools.R')
+1774781510831:source('Rcode/analysis_tools.R')
+1774781510919:source('Rcode/plots.R')
+1774781511006:source('Rcode/common.R')
+1774781511029:source('Rcode/ssGSEA.Library.R')
+1774781512242:meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+1774781514959:M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+1774781584670:# M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+1774781584672:M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+1774781600460:M.mx.l2 <- log2(M.mx+1)
+1774781601916:annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+1774781602629:# Step 1: Extract rownames as column
+1774781602631:annot_df <- annot %>% rownames_to_column("gene_id") %>% dplyr::select(gene_id, gene)
+1774781602705:expr_df <- as.data.frame(M.mx.l2) %>% rownames_to_column("gene_id")
+1774781602735:# Step 2: Inner join (only rows in M.mx.l2)
+1774781602736:M.mx.l2.annotated <- expr_df %>%
+1774781602737:inner_join(annot_df, by = "gene_id")
+1774781602862:# Step 3: Move gene_id back to rownames
+1774781602863:rownames(M.mx.l2.annotated) <- M.mx.l2.annotated$gene_id
+1774781602889:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::select(-gene_id)
+1774781602919:# Step 4: Report on join success
+1774781602920:cat("=== JOIN REPORT ===\n\n")
+1774781602921:cat("Rows in annot:              ", nrow(annot), "\n")
+1774781602923:cat("Rows in M.mx.l2:            ", nrow(M.mx.l2), "\n")
+1774781602925:cat("Rows after inner_join:      ", nrow(M.mx.l2.annotated), "\n\n")
+1774781602926:# Check for unmatched
+1774781602927:unmatched_annot <- anti_join(annot_df, expr_df, by = "gene_id")
+1774781603038:unmatched_expr <- anti_join(expr_df, annot_df, by = "gene_id")
+1774781603110:cat("Genes in annot but NOT in M.mx.l2:    ", nrow(unmatched_annot), "\n")
+1774781603112:cat("Genes in M.mx.l2 but NOT in annot:    ", nrow(unmatched_expr), "\n\n")
+1774781603113:# Success status
+1774781603114:if (nrow(M.mx.l2.annotated) == nrow(M.mx.l2)) {
+1774781603115:cat("✓ SUCCESS: All rows from M.mx.l2 matched to annotation!\n")
+1774781603116:} else {
+1774781603117:cat("⚠ WARNING: Some rows from M.mx.l2 did NOT match annotation\n")
+1774781603118:cat("  Unmatched genes:", paste(head(unmatched_expr$gene_id, 5), collapse=", "), "\n")
+1774781603120:}
+1774781603124:# View result
+1774781603125:cat("\nFinal structure:\n")
+1774781603126:print(head(M.mx.l2.annotated[, 1:8]))
+1774781603496:M.mx.l2.annotated <- mutate(M.mx.l2.annotated, Avg = rowMeans(as.matrix(dplyr::select(M.mx.l2.annotated, ends_with("XX")), na.rm = TRUE)))
+1774781604167:mpg <- rep('No', nrow(M.mx.l2.annotated))
+1774781604173:for (i in unique(M.mx.l2.annotated[,"gene"])){
+1774781604175:if (is.na(i)){next}
+1774781604177:idxs <- which(M.mx.l2.annotated[,"gene"] == i)
+1774781604179:max_idx <- which(M.mx.l2.annotated$Avg[idxs] == max(M.mx.l2.annotated$Avg[idxs]))[1]
+1774781604183:mpg[idxs[max_idx]] <- 'Yes'
+1774781604185:}
+1774781611144:M.mx.l2.annotated$MPG <- mpg
+1774781611354:M.mx.l2.annotated <- M.mx.l2.annotated %>% dplyr::filter(MPG == "Yes") %>% dplyr::select(-Avg,-MPG)
+1774781611720:expr_matrix <- M.mx.l2.annotated %>%
+1774781611722:rownames_to_column("old_id") %>%
+1774781611723:dplyr::select(-old_id) %>%
+1774781611724:column_to_rownames("gene")
+1774781611749:expr_matrix <- as.matrix(expr_matrix)
+1774781612257:# Remove genes with zero variance BEFORE scaling
+1774781612259:gene_sds <- apply(expr_matrix, 1, sd)
+1774781614306:expr_matrix.filtered <- expr_matrix[gene_sds > 0, ]
+1774781614389:cat("Genes removed (zero variance):", nrow(expr_matrix) - nrow(expr_matrix), "\n")
+1774781614736:cat("Genes remaining:", nrow(expr_matrix), "\n")
+1774781614738:# Now row-center
+1774781614739:expr_matrix.rc <- calculate_zscore(expr_matrix.filtered)
+1774781620087:# Verify - should have NO NaN
+1774781620088:print(sum(is.nan(expr_matrix.rc)))
+1774781620389:expr_matrix.rc.transposed <- t(expr_matrix.rc)
+1774781620844:Ferroptosis <- c("CBS","PRNP","MAP1LC3B","SLC7A11","ACSL6","SAT2","TF","SLC11A2","CP","FTL","LPCAT3","ATG7","CTH",
+1774781620847:"CYBB","AKR1C1","AKR1C2","DPP4","ACSL1","ACSL3","ACSL4","FDFT1","SLC39A14","ALOX15","FTH1","GCH1",
+1774781620849:"NOX1","COQ2","GCLC","GCLM","GPX4","GSS","SLC40A1","HMGCR","HMOX1","HSPB1","IREB2","MAP1LC3C",
+1774781620850:"NOX4","PCBP1","PCBP2","CHMP5","ACSL5","PHKG2","POR","STEAP3","CISD1","BACH1","SAT1","SLC39A8",
+1774781620852:"SLC1A5","SLC3A2","TFRC","TP53","TXNRD1","VDAC2","VDAC3","CHMP6","NCOA4","SLC38A1","MAP1LC3A",
+1774781620854:"AIFM2","AKR1C3","FTMT","ATG5")
+1774781620858:Iron_intake <- c("SCARA5","LRP1","CD163","CYBRD1","FRRS1","SLC11A2","FLVCR2","SLC48A1","STEAP1","STEAP2","STEAP3",
+1774781620860:"STEAP4","TF","TFR2","TFRC","SLC39A8","SLC39A14")
+1774781620864:Iron_utilization <- c("FTH1","FTL","HMOX1","HIF1A","EPAS1","HIF3A","SLC25A37","SLC25A28","EGLN2","EGLN1","EGLN3","P4HTM")
+1774781620868:Iron_efflux <- c("CP","SLC40A1","HAMP","FLVCR1","HEPH")
+1774781620871:Fatty_acid <- c("ACAA1","ACAA2","ACACA","ACACB","ACAD10","ACAD11","ACAD8","ACAD9","ACADL","ACADM","ACADS","ACADSB","ACADVL","ACAT1",
+1774781620873:"ACAT2","ACBD3","ACBD4","ACBD5","ACBD6","ACBD7","ACOX1","ACOX2","ACOX3","ACOXL","ACSBG1","ACSBG2","ACSF2","ACSF3",
+1774781620875:"ACSL1","ACSL3","ACSL4","ACSL5","ACSL6","ACSM1","ACSM2A","ACSM2B","ACSM3","ACSM4","ACSM5","ACSS1","ACSS2","ACSS3",
+1774781620876:"CLYBL","CPT1A","CPT1B","CPT1C","CPT2","CYP4A11","CYP4A22","CYP4B1","CYP4F11","CYP4F12","CYP4F2","CYP4F22","CYP4F3",
+1774781620878:"CYP4F8","CYP4V2","CYP4X1","CYP4Z1","DCI","DECR1","DECR2","DGAT1","DGAT2","DGAT2L3","DGAT2L4","DGAT2L6","DGAT2L7",
+1774781620880:"ECH1","ECHDC1","ECHDC2","ECHDC3","ECHS1","EHHADH","ELOVL1","ELOVL2","ELOVL3","ELOVL4","ELOVL5","ELOVL6","ELOVL7",
+1774781620881:"ETFA","ETFB","ETFDH","FA2H","FAAH","FAAH2","FADS1","FADS2","FADS3","FAR1","FAR2","FASN","GPSN2","HACL1","HADH",
+1774781620883:"HADHA","HADHB","LIPC","LIPF","LIPG","LIPH","LIPI","LIPJ","LIPK","LIPM","LIPN","LPL","LPPR2","MCAT","MECR","MGLL",
+1774781620885:"MLYCD","MTTP","OLAH","OXSM","PECI","PECR","PHYH","PHYHD1","PNLIP","PNLIPRP1","PNLIPRP2","PNLIPRP3","PNPLA1",
+1774781620886:"PNPLA2","PNPLA3","PNPLA4","PNPLA5","PNPLA6","PNPLA7","PNPLA8","SCD","SCD5","SCP2","SDR16C6","SDR39U1","SDR42E1","SDR9C7")
+1774781620891:Fatty_acid_uptake <- c("CD36","FABP4","SLC27A1","CAV1")
+1774781620895:Unsaturated_FA_biosynthetic_process <- c("ABCD1","ABCD2","AKR1C3","ALOX12","ALOX15","ALOX15B","ANXA1","AVP","AVPR1A",
+1774781620896:"CBR1","CD74","DAGLB","DECR2","DEGS1","EDN1","EDN2","ELOVL1","ELOVL2","ELOVL3",
+1774781620898:"ELOVL4","ELOVL5","ELOVL6","ELOVL7","FABP5","FADS1","FADS2","FADS2B","FADS3",
+1774781620900:"HPGDS","IL1B","MIF","MIR132","MIR204","MIR766","PIBF1","PLA2G3","PLA2G4A","PLA2G4F",
+1774781620901:"PNPLA8","PRXL2B","PTGDS","PTGES","PTGES2","PTGES3","PTGIS","PTGS1","PTGS2","SCD",
+1774781620903:"SCD5","SIRT1","TBXAS1")
+1774781620907:Membrane_Lipid <- c("AGPAT1","AGPAT2","AGPAT3","AGPAT4","AGPAT5","AGPAT6","AGPAT9","CDS1","CDS2","CEPT1","CHKA","CHKB","CHPT1",
+1774781620909:"CLC","CRLS1","CROT","DAGLA","DAGLB","DGKA","DGKB","DGKD","DGKE","DGKG","DGKH","DGKI","DGKK","DGKQ","DGKZ",
+1774781620910:"ETNK1","ETNK2","GDE1","GK","GK2","GK5","GNPAT","GPAM","GPD1","GPD1L","GPD2","LPCAT1","LPCAT2","LPCAT3",
+1774781620912:"LPCAT4","LPGAT1","LPIN1","LPIN2","LPIN3","LYPLA1","LYPLA2","LYPLAL1","MBOAT1","MBOAT2","MBOAT4","MBOAT7",
+1774781620914:"MOGAT1","MOGAT2","MOGAT3","NAPE-PLD","PAP2D","PCYT1A","PCYT1B","PCYT2","PEMT","PGS1","PHOSPHO1","PISD",
+1774781620915:"PLA1A","PLA2G10","PLA2G12A","PLA2G12B","PLA2G15","PLA2G16","PLA2G1B","PLA2G2A","PLA2G2C","PLA2G2D","PLA2G2E",
+1774781620917:"PLA2G2F","PLA2G3","PLA2G4A","PLA2G4B","PLA2G4C","PLA2G4D","PLA2G4E","PLA2G4F","PLA2G5","PLA2G6","PLA2G7",
+1774781620919:"PLB1","PLCB1","PLCB2","PLCB3","PLCB4","PLCD1","PLCD3","PLCD4","PLCE1","PLCG1","PLCG2","PLCH1","PLCH2",
+1774781620921:"PLCL1","PLCL2","PLCXD1","PLCXD2","PLCXD3","PLCZ1","PLD1","PLD2","PLD3","PLD4","PLD5","PLD6","PPAP2A",
+1774781620922:"PPAP2B","PPAP2C","PPAPDC1A","PPAPDC1B","PPAPDC2","PPAPDC3","PRG2","PTDSS1","PTDSS2")
+1774781620926:Redox <- c("CP","CRYZ","CRYZL1","CYB561","CYB5A","CYB5B","CYB5D1","CYB5D2","CYB5R1","CYB5R2","CYB5R3","CYB5R4","CYB5RL","CYBA",
+1774781620928:"CYBASC3","CYBB","CYBRD1","DHRS1","DHRS11","DHRS12","DHRS13","DHRS2","DHRS3","DHRS4","DHRS4L1","DHRS4L2","DHRS7",
+1774781620929:"DHRS7B","DHRS7C","DHRS9","DHRSX","DHTKD1","ENOX1","ENOX2","FDX1","FDX1L","FDXR","FOXRED1","FOXRED2","FRRS1","GLRX",
+1774781620930:"GLRX2","GLRX3","GLRX5","GRXCR1","GRXCR2","ISCA1","ISCA1L","ISCA2","LPO","MICAL1","MICAL2","MICAL3","NDOR1","NMRAL1",
+1774781620934:"OGFOD1","OGFOD2","OXA1L","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5","PRDX6","PYROXD1")
+1774781620937:# Ferroptosis_pathways2
+1774781620939:Complex_I_IV <- c("MT-ND1","MT-ND2","MT-ND3","MT-ND4","MT-ND4L","MT-ND5","MT-ND6","NDUFA1","NDUFA10","NDUFA11","NDUFA12",
+1774781620940:"NDUFA13","NDUFA2","NDUFA3","NDUFA4","NDUFA4L","NDUFA4L2","NDUFA5","NDUFA6","NDUFA7","NDUFA8","NDUFA9",
+1774781620942:"NDUFAB1","NDUFAF1","NDUFAF2","NDUFB1","NDUFB10","NDUFB11","NDUFB2","NDUFB3","NDUFB4","NDUFB5","NDUFB6",
+1774781620943:"NDUFB7","NDUFB8","NDUFB9","NDUFC1","NDUFC2","NDUFS1","NDUFS2","NDUFS3","NDUFS4","NDUFS5","NDUFS6","NDUFS7",
+1774781620944:"NDUFS8","NDUFV1","NDUFV2","NDUFV3","SDHA","SDHB","SDHC","SDHD","CYC1","CYCS","MT-CYB","UCRC","UQCR",
+1774781620946:"UQCRB","UQCRC1","UQCRC2","UQCRFS1","UQCRH","UQCRQ","COX1","COX10","COX11","COX15","COX16","COX17","COX18",
+1774781620947:"COX19","COX2","COX3","COX4I1","COX4I2","COX5A","COX5B","COX6A1","COX6A2","COX6B1","COX6B2","COX6C","COX7A1",
+1774781620949:"COX7A2","COX7A2L","COX7B","COX7B2","COX7C","COX8A","COX8C")
+1774781620952:Reactive_oxygen_species_pathway <- c("ABCC1","ATOX1","CAT","CDKN2D","EGLN2","ERCC2","FES","FTL","G6PD","GCLC","GCLM","GLRX",
+1774781620954:"GLRX2","GPX3","GPX4","GSR","HHEX","HMOX2","IPCEF1","JUNB","LAMTOR5","LSP1","MBP","MGST1",
+1774781620955:"MPO","MSRA","NDUFA6","NDUFB4","NDUFS2","NQO1","OXSR1","PDLIM1","PFKP","PRDX1","PRDX2",
+1774781620956:"PRDX4","PRDX6","PRNP","PTPA","SBNO2","SCAF4","SELENOS","SOD1","SOD2","SRXN1","STK25",
+1774781620958:"TXN","TXNRD1","TXNRD2")
+1774781620961:LOXs <- c("ALOX12","ALOX12B","ALOX15","ALOX15B","ALOX5","ALOX5AP","ALOX8","ALOXE3")
+1774781620964:BH4 <- c("GCH1","PTS","QDPR","SPR")
+1774781620967:Folate <- c("DHFR","DHFRL1","FPGS","MTHFD1","MTHFD1L","MTHFD2","MTHFD2L","MTHFR","MTHFS","MTHFSD","SHMT1","SHMT2")
+1774781620969:Glutathione <- c("GCLC","GCLM","GPX1","GPX2","GPX3","GPX4","GPX5","GPX6","GPX7","GPX8","GSR","GSS","GSTA1","GSTA2","GSTA3",
+1774781620971:"GSTA4","GSTA5","GSTCD","GSTK1","GSTM1","GSTM2","GSTM3","GSTM4","GSTM5","GSTO1","GSTO2","GSTP1","GSTT1",
+1774781620972:"GSTT2","HAGH","HAGHL","MGST1","MGST2","MGST3")
+1774781620974:CoQ10 <- c("PDSS1","PDSS2","COQ2","COQ3","COQ6","COQ5","COQ7","COQ8A","COQ9","COQ8B")
+1774781620976:Thioredoxin <- c("TXNRD1","TXNRD2","TXNRD3","NXN","TXN","SELENOT","TXNDC2","PRDX1","PRDX2","PRDX3","PRDX4","PRDX5")
+1774781620979:Glutamate_transmembrane <- c("ARL6IP1","ARL6IP5","ATP1A2","CLN8","GRM1","ITGB1","KCNJ10","NTSR1","PER2","PRAF2","PSEN1",
+1774781620980:"SLC17A6","SLC17A7","SLC17A8","SLC1A1","SLC1A2","SLC1A3","SLC1A6","SLC1A7","SLC25A12","SLC25A13",
+1774781620981:"SLC25A18","SLC25A22","SLC38A7","SLC7A11")
+1774781620983:homocysteine_metabolic_process <- c("BHMT","BLMH","CBS","CBSL","CPS1","CTH","DPEP1","MMUT","MPST","MTHFR","MTRR","NOX4","TST")
+1774781620986:Pentose_Phosphate <- c("DERA","G6PD","PGD","PGLS","RPE","RPIA","TALDO1","TKT","TKTL1","TKTL2")
+1774781620988:Glycolysis <- c("ADPGK","ALDOA","ALDOB","ALDOC","BPGM","DLAT","ENO1","ENO2","ENO3","GAPDH","GAPDHS","GCK","GPI","HK1","HK2",
+1774781620990:"HK3","HKDC1","PDHA1","PDHA2","PDHB","PDHX","PFKFB1","PFKFB2","PFKFB3","PFKFB4","PFKL","PFKM","PFKP","PGAM1",
+1774781620991:"PGAM2","PGAM4","PGAM5","PGK1","PGK2","PGM1","PGM2","PGM2L1","PGM5","PKLR","PKM2","TPI1")
+1774781620993:Krebs <- c("ACLY","ACO1","ACO2","CS","D2HGDH","DLST","FH","HCCS","IDH1","IDH2","IDH3A","IDH3B","IDH3G","L2HGDH","MDH1","MDH1B",
+1774781620994:"MDH2","ME1","ME2","ME3","OGDH","OGDHL","PC","SUCLA2","SUCLG1","SUCLG2")
+1774781620996:# EMT and Others
+1774781620998:EMT.Klughammer <- c("IGFBP7","SPARC","COL1A2","COL4A1","COL3A1","BGN","ACTA2","FN1","COL4A2","TAGLN",
+1774781620999:"DCN","COL1A1","LUM","COL6A3","POSTN","AEBP1","COL6A2","VIM","TIMP1","TPM2","COL5A1",
+1774781621000:"CALD1","COL6A1","A2M","SPARCL1","THY1","VCAN","CCN2","GNG11","PDGFRB","RGS5",
+1774781621001:"ITGA1","MYL9","COL5A2","COL18A1","THBS2","IGHA1","CAVIN1","ELN","NID1","LHFPL6",
+1774781621002:"APOE","IGLC3","HSPG2","CAV1","TCF4","NNMT","ASPN","FSTL1","MGP")
+1774781621004:EMT.Hallmark <- c("ABI3BP", "ACTA2","ADAM12","ANPEP","APLP1","AREG","BASP1","BDNF","BGN","BMP1",
+1774781621005:"CADM1","CALD1","CALU","CAP2","CAPG","CCN1","CCN2","CD44","CD59","CDH11","CDH2",
+1774781621006:"CDH6","COL11A1","COL12A1","COL16A1","COL1A1","COL1A2","COL3A1","COL4A1","COL4A2",
+1774781621007:"COL5A1","COL5A2","COL5A3","COL6A2","COL6A3","COL7A1","COL8A2","COLGALT1","COMP",
+1774781621009:"COPA","CRLF1","CTHRC1","CXCL1","CXCL12","CXCL6","CXCL8","DAB2","DCN","DKK1","DPYSL3",
+1774781621010:"DST","ECM1","ECM2","EDIL3","EFEMP2","ELN","EMP3","ENO2","FAP","FAS","FBLN1","FBLN2",
+1774781621011:"FBLN5","FBN1","FBN2","FERMT2","FGF2","FLNA","FMOD","FN1","FOXC2","FSTL1","FSTL3",
+1774781621012:"FUCA1","FZD8","GADD45A","GADD45B","GAS1","GEM","GJA1","GLIPR1","GPC1","GPX7",
+1774781621013:"GREM1","HTRA1","ID2","IGFBP2","IGFBP3","IGFBP4","IL15","IL32","IL6","INHBA","ITGA2",
+1774781621014:"ITGA5","ITGAV","ITGB1","ITGB3","ITGB5","JUN","LAMA1","LAMA2","LAMA3","LAMC1","LAMC2",
+1774781621015:"LGALS1","LOX","LOXL1","LOXL2","LRP1","LRRC15","LUM","MAGEE1","MATN2","MATN3","MCM7",
+1774781621016:"MEST","MFAP5","MGP","MMP1","MMP14","MMP2","MMP3","MSX1","MXRA5","MYL9","MYLK","NID2",
+1774781621017:"NNMT","NOTCH2","NT5E","NTM","OXTR","P3H1","PCOLCE","PCOLCE2","PDGFRB","PDLIM4","PFN2",
+1774781621019:"PLAUR","PLOD1","PLOD2","PLOD3","PMEPA1","PMP22","POSTN","PPIB","PRRX1","PRSS2","PTHLH",
+1774781621020:"PTX3","PVR","QSOX1","RGS4","RHOB","SAT1","SCG2","SDC1","SDC4","SERPINE1","SERPINE2",
+1774781621021:"SERPINH1","SFRP1","SFRP4","SGCB","SGCD","SGCG","SLC6A8","SLIT2","SLIT3","SNAI2",
+1774781621022:"SNTB1","SPARC","SPOCK1","SPP1","TAGLN","TFPI2","TGFB1","TGFBI","TGFBR3","TGM2",
+1774781621023:"THBS1","THBS2","THY1","TIMP1","TIMP3","TNC","TNFAIP3","TNFRSF11B","TNFRSF12A",
+1774781621024:"TPM1","TPM2","TPM4","VCAM1","VCAN","VEGFA","VEGFC","VIM","WIPF1","WNT5A")
+1774781621027:EMT.prelim <- c("VIM","ZEB1","ZEB2","ITGA2")
+1774781621030:EMT.76gs <- c("CHEK2","FZR1","CHAF1B","CDS1","AP1M2","FN1","EPPK1","BSPRY","HNMT","PRR5","ST14","EPN3","ZEB1",
+1774781621031:"CLDN7","SH3YL1","PRSS22","TGFBI","CRB3","MUC1","DSP","RBPMS","ELMO3","CLDN4","ENPP5","EPB41L5",
+1774781621032:"MPZL2","EPHA1","PPARG","RAB25","CARD6","SCNN1A","ERBB3","SPINT2","EVPL","TACSTD2","TMC4","CDH1",
+1774781621033:"TNFRSF21","FXYD3","MPP7","GALNT3","GALNT5","NRP1","AXL","PRSS8","GRHL1","GRHL2","S100A14","CDH3",
+1774781621034:"SERINC2","SHROOM3","ITGB6","SSH3","KLC3","STAP2","ANTXR2","ANKRD22","TJP3","LIX1L","TMEM125",
+1774781621035:"TMEM45B","MAL2","VIM","MAPK13","MMP2","KRT19","KRTCAP3","ESRP1","XXYLT1","TC2N","ADGRF1","ADGRG1",
+1774781621036:"S100A11P1","CDH15","PATJ","TSKU")
+1774781621039:EMT.MLR_method <- c("FZR1","PAPPA-AS1","CCM2","CDKN2AIP","CLDN7","VIM","CDH1","GRHL2","OVOL1","SLC25A42","SNX13",
+1774781621040:"TAF4B","CRIP2","CDK2","MBNL1","NEURL1B","ANG","RNASE4","PPFIBP1","PACSIN1","LRRTM1","TMEM182",
+1774781621041:"CSMD1","ZNF503-AS2","CCNF","DIRC1","MBTPS2","RNF150","RC3H2","UBE3C","HUNK","CEP135","SAFB2",
+1774781621042:"OSM","MTAP","PDS5B","ACTN4","AFF3","THAP4","ZNF490","CLU","GGCX","CARF","REXO2","LIG3",
+1774781621043:"SRD5A3-AS1","FZD10-AS1","ADAMTS7P3","ADAMTS7","MIAT","COG1","CD47","PLEKHB2","BAIAP2-DT")
+1774781621045:EMT.cell_line.epi <- c("CDH1","AGR2","EPCAM","KRT19","RAB25","TACSTD2","S100P","CEACAM6","GALNT3","FXYD3","SPINT2",
+1774781621046:"TMEM30B","SCNN1A","ST14","ESRP1","S100A14","CLDN7","ERBB3","RBM47","SPINT1","ELF3","CLDN4",
+1774781621047:"PRSS8","SH3YL1","EHF","LCN2","JUP","VAMP8","KRT8","C1orf106","KRT7","DSP","CDS1","ITGB4",
+1774781621048:"TMPRSS4","LSR","SORL1","GRHL2","PPL","C1orf116","TSPAN1","MAP7","SLPI","TOX3","ARHGAP8","F11R",
+1774781621049:"LAD1","GPX2","CTSH","GPR56","FA2H","KLF5","AREG","KRT18","SCEL","CDH3","UGT1A1","MPZL2","AIM1",
+1774781621050:"OVOL2","LLGL2","ESRP2","MYO5C","DDR1","VGLL1","IRF6","SFN","TSPAN13","KCNK1","MYO1D","PKP3",
+1774781621052:"ITGB6","LY75","MAPK13","TTC39A","ELMO3","CEACAM1","DTX4","ERBB2","RAB11FIP1","ATP2C2","MST1R",
+1774781621053:"AP1M2","TGFA","MYO6","PTK6","OAS1","FBP1","AQP3","CBLC","EPHA1","BSPRY","SH2D3A","EPS8L1","GRB7",
+1774781621054:"C4orf19","KLK6","TJP2","PLS1","DENND2D","EPS8L2","IL20RA","HES1","IL1RN","EXPH5","ARHGDIB",
+1774781621055:"C19orf21","CAMK2N1","HPGD","SYNGR2","C10orf116","PERP","MANSC1","DSC2","POF1B","SERINC5","BIK",
+1774781621056:"ANXA9","MALL","EPN3","STAP2","FOXA1","PYCARD","ZNF165","SLC37A1","ANK3","TSPAN15","HNMT","ABCC3",
+1774781621057:"SDC1","CKMT1A","TOB1","B3GNT3","TMC6","CD9","ADAP1","ATP1B1","SHANK2","CYB561","ERMP1","RAB20",
+1774781621058:"MYH14","CAPN1","ALDH3B2","TRIM31","ARAP2","SSH3","ICA1","ARHGEF5","ALOX5","RHOD","TMPRSS2","MTUS1",
+1774781621059:"CYP4F3","PPFIBP2","RABGAP1L","PLXNB2","MGST2","OR7E14P","EVPL","CD46","KRT15","CNKSR1","BLNK",
+1774781621060:"COMT","ANXA4","TNFSF13","OCLN","SLC9A3R1","XBP1")
+1774781621063:EMT.cell_line.mes <- c("VIM","ZEB1","EMP3","SACS","AXL","LOXL2","SPARC","FHL1","FERMT2","TUBA1A","TMEM158","CALD1",
+1774781621064:"LGALS1","PMP22","MSN","GLYR1","MAP1B","AP1S2","GJA1","DENND5A","C12orf24","TPM2","TUBB6",
+1774781621065:"SRPX","ANK2","CHN1","SH2B3","LEPRE1","ETV1","SOBP","AKAP12","TGFB1I1","SERPINE1","SOAT1",
+1774781621066:"COL5A2","LHFP","CEP170","POPDC3","TRPC1","KDELC1","MYL9","BAG2","FSTL1","MXRA7","GFPT2",
+1774781621068:"RECK","TMEFF1","PTRF")
+1774781621070:EMT.tumor.epi <- c("KRT19","AGR2","RAB25","CDH1","ERBB3","FXYD3","SLC44A4","S100P","SCNN1A","GALNT3","PRSS8","ELF3",
+1774781621071:"CEACAM6","TMPRSS4","CLDN7","TACSTD2","CLDN3","EPCAM","SPINT1","TSPAN1","PLS1","TMEM30B","PRR15L",
+1774781621072:"KRT8","ST14","RBM47","S100A14","C1orf106","NQO1","TOX3","PTK6","TFF1","CLDN4","GPRC5A","TJP3",
+1774781621073:"KRT18","MAP7","CKMT1A","ESRP1","MUC1","SPINT2","ESRP2","CDS1","PPAP2C","CEACAM7","TTC39A","OVOL2",
+1774781621074:"EHF","AP1M2","CEACAM5","LAD1","ARHGAP8","TFF3","JUP","CD24","TMC5","MLPH","ELMO3","ERBB2","LLGL2",
+1774781621075:"DDR1","FA2H","CBLC","TMPRSS2","LSR","PERP","POF1B","MYO5C","RAB11FIP1","MAPK13","KRT7","CEACAM1",
+1774781621076:"CXADR","ATP2C2","RNF128","MPZL2","EPS8L1","GALNT7","CORO2A","BCAS1","TPD52","ARHGAP32","FUT2",
+1774781621078:"OR7E14P","GALE","GRHL2","BIK","RAPGEFL1","STYK1","F11R","PKP3","CYB561","SH3YL1","GDF15","PSCA",
+1774781621079:"EZR","TJP2","FGFR3","FUT3","BSPRY","TOM1L1  ","IRF6","EPB41L4B","OCLN","LRRC1","C19orf21",
+1774781621080:"ABHD11","EPS8L2","MYO6","TSPAN8","MST1R","SLC16A5","GPR56","AZGP1","TOB1","SLC35A3","TRPM4",
+1774781621081:"PHLDA2","VAMP8","SLC22A18","AKR1B10","VAV3","SPAG1","ABCC3","SYNGR2","STAP2","C4orf19","PPL",
+1774781621082:"PLLP","DSG2","HDHD3","CD2AP","MANSC1","DHCR24","EPN3","TUFT1","GMDS","EXPH5","DSP","SDC4","IL20RA",
+1774781621083:"FAM174B","PTPRF","SORD")
+1774781621087:EMT.tumor.mes <- c("GAS1","CXCL12","ZEB1","GLYR1","FHL1","FERMT2","C1S","FYN","WIPF1","CYP1B1","SERPING1","SERPINF1",
+1774781621089:"VCAM1","MAP1B","TCF4","SRPX","EMP3","DPT","CALD1","PTGIS","VIM","CD163","C1R","FBN1","FN1","FXYD6",
+1774781621090:"IGF1","NAP1L3","MRC1","QKI","MS4A4A","DCN","LOX","RECK","ANK2","LY96","ZFPM2","CSRP2","EFEMP1",
+1774781621091:"RARRES2","PTPRC","PLEKHO1","RGS2","F13A1","JAM2","CHRDL1","TUBA1A","AP1S2","MYLK","DDR2","DSE",
+1774781621093:"SACS","GLIPR1","CXCL13","FLRT2","PTX3","AKT3","COL6A2","DPYSL3","CDH11","PDZRN3","ZEB2","CCL2",
+1774781621094:"MAFB","SFRP1","C14orf139","MFAP4","MAF","UCHL1","TUBB6","SRGN","HEG1","KCNJ8","AKAP12","EVI2A",
+1774781621095:"COL14A1","AXL","ECM2","FSTL1","PLN","MYL9","OLFML3","STON1","SLIT2","BICC1","SOBP","CLIC4","ENPP2",
+1774781621096:"SAMSN1","TPM2","ASPN","COL6A1","IGFBP5","MOXD1","AKAP2","SLC2A3","OLFML2B","ANGPTL2","PCOLCE",
+1774781621097:"COLEC12","CTSK","TAGLN","CDH2","IL10RA","C1orf54","CEP170","TNS1","CLEC2B","JAM3","SEPT6","GREM1",
+1774781621098:"VCAN","ZCCHC24","CRYAB","SFRP4","RUNX1T1","FGL2","MS4A6A","PTRF","GIMAP4","TWIST1","GFPT2","LHFP",
+1774781621099:"CXCR4","SPOCK1","SPARC","VSIG4","GPM6B","TRPC1","SNAI2","GUCY1B3","PLXNC1","SYT11","FLI1","MYH10",
+1774781621100:"CSF2RB","TNC","PMP22","COL5A2","MMP2","GNG11","CAV1","CDK14","SDC2","PTGDS","NR3C1","SYNM","FAP",
+1774781621101:"NUAK1","WWTR1","FBLN1","MPDZ","SYNE1","EFEMP2","GIMAP6","KIAA1462","CCL8","COL15A1","CHN1","CRISPLD2",
+1774781621102:"PDGFC","GEM","ISLR","GZMK","SPARCL1","BNC2","BGN","MEOX2","ITM2A","IFFO1")
+1774781621105:LAM <- c("TREM2","APOE","C1Q2A","C1QB","C1QC","CD9","CD163")
+1774781621108:exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21","CXCL13","CD244")
+1774781621318:gsva_params <- gsvaParam(exprData = expr_matrix,
+1774781621321:geneSets = list(
+1774781621324:Fatty_acid_uptake.gsva = Fatty_acid_uptake,
+1774781621327:LOXs.gsva = LOXs,
+1774781621329:Thioredoxin.gsva = Thioredoxin,
+1774781621332:Glutamate_transmembrane.gsva = Glutamate_transmembrane,
+1774781621334:Membrane_Lipid.gsva = Membrane_Lipid,
+1774781621338:Unsat_FA_biosynth_process.gsva = Unsaturated_FA_biosynthetic_process,
+1774781621340:Fatty_acid.gsva = Fatty_acid,
+1774781621343:Iron_intake.gsva = Iron_intake,
+1774781621345:Iron_utilization.gsva = Iron_utilization,
+1774781621347:Glutathione.gsva = Glutathione,
+1774781621349:BH4.gsva = BH4,
+1774781621352:CoQ10.gsva = CoQ10
+1774781621354:))
+1774781621415:Heatmap.GSVA.scores <- gsva(gsva_params)
+1774781629591:Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
+1774781629790:source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+1774781630052:KSScore.EMTSignature.file = "./EM_gene_signature_tumor_KS.xlsx"
+1774781630191:met500.ks.emt <- KSScore(expr_matrix,"met500",".")
+1774781634401:met500.ks.emt <- as.data.frame(met500.ks.emt)
+1774781634994:# Convert all to dataframes with rownames as column
+1774781634997:gsva_df <- as.data.frame(Heatmap.GSVA.scores.transposed) %>%
+1774781635000:rownames_to_column("Sample")
+1774781635024:expr_df <- as.data.frame(expr_matrix.rc.transposed) %>%
+1774781635026:rownames_to_column("Sample")
+1774781635484:met_df <- as.data.frame(met500.ks.emt) %>%
+1774781635485:rownames_to_column("Sample")
+1774781635489:# Join all three by Sample
+1774781635490:merged_all <- gsva_df %>%
+1774781635492:inner_join(expr_df, by = "Sample") %>%
+1774781635493:inner_join(met_df, by = "Sample")
+1774781635816:# Convert Sample back to rownames
+1774781635818:rownames(merged_all) <- merged_all$Sample
+1774781635837:merged_all <- merged_all %>% dplyr::select(-Sample)
+1774781635917:# Report on join success
+1774781635918:cat("=== THREE-WAY JOIN REPORT ===\n\n")
+1774781635919:cat("Rows in GSVA scores:                  ", nrow(gsva_df), "\n")
+1774781635921:cat("Rows in expression matrix:            ", nrow(expr_df), "\n")
+1774781635923:cat("Rows in met500.ks.emt:                ", nrow(met_df), "\n")
+1774781635925:cat("Rows after inner_join:                ", nrow(merged_all), "\n\n")
+1774781635927:# Check for unmatched
+1774781635928:unmatched_gsva <- anti_join(gsva_df, expr_df, by = "Sample") %>%
+1774781635929:anti_join(met_df, by = "Sample")
+1774781636023:unmatched_expr <- anti_join(expr_df, gsva_df, by = "Sample") %>%
+1774781636025:anti_join(met_df, by = "Sample")
+1774781636205:unmatched_met <- anti_join(met_df, gsva_df, by = "Sample") %>%
+1774781636207:anti_join(expr_df, by = "Sample")
+1774781636305:cat("Samples in GSVA but NOT in others:    ", nrow(unmatched_gsva), "\n")
+1774781636307:cat("Samples in expr but NOT in others:    ", nrow(unmatched_expr), "\n")
+1774781636309:cat("Samples in met but NOT in others:     ", nrow(unmatched_met), "\n\n")
+1774781636311:# Success status
+1774781636312:if (nrow(merged_all) > 0) {
+1774781636313:cat("✓ SUCCESS: Join completed!\n")
+1774781636314:cat("  Final dimensions: ", nrow(merged_all), " samples × ", ncol(merged_all), " variables\n\n")
+1774781636315:} else {
+1774781636316:cat("✗ ERROR: No matching samples found!\n")
+1774781636317:}
+1774781636320:# View result
+1774781636322:cat("Final structure:\n")
+1774781636323:print(head(merged_all[, 1:8]))
+1774781636689:# Helper function to get correlation statistics
+1774781636693:get_cor_stats <- function(x, y) {
+1774781636696:# Remove NA values
+1774781636699:idx <- !is.na(x) & !is.na(y)
+1774781636702:x <- x[idx]
+1774781636705:y <- y[idx]
+1774781636710:# Calculate correlation
+1774781636713:cor_test <- cor.test(x, y, method = "pearson")
+1774781636715:r_squared <- cor_test$estimate^2
+1774781636718:p_value <- cor_test$p.value
+1774781636723:return(list(r_squared = r_squared, p_value = p_value))
+1774781636726:}
+1774781636730:# Plot 1: BH4.gsva
+1774781636733:stats1 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$BH4.gsva)
+1774781636746:title1 <- sprintf("Scatterplot of met500.ks.emt vs BH4.gsva - (R² = %.2f, p = %.2e)",
+1774781636749:stats1$r_squared, stats1$p_value)
+1774781636754:ggplot(merged_all, aes(x = met500.ks.emt, y = BH4.gsva)) +
+1774781636757:geom_point(color = "steelblue", size = 2) +
+1774781636759:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774781636762:labs(
+1774781636764:title = title1,
+1774781636766:x = "met500.ks.emt",
+1774781636769:y = "BH4 gsva"
+1774781636771:) +
+1774781636773:theme_minimal()
+1774781637570:# Plot 2: ACSL4
+1774781637572:stats2 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$ACSL4)
+1774781637590:title2 <- sprintf("Scatterplot of met500.ks.emt vs ACSL4 - (R² = %.2f, p = %.2e)",
+1774781637591:stats2$r_squared, stats2$p_value)
+1774781637594:ggplot(merged_all, aes(x = met500.ks.emt, y = ACSL4)) +
+1774781637596:geom_point(color = "steelblue", size = 2) +
+1774781637597:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774781637598:labs(
+1774781637599:title = title2,
+1774781637600:x = "met500.ks.emt",
+1774781637601:y = "ACSL4 (Z-Score)"
+1774781637602:) +
+1774781637603:theme_minimal()
+1774781638304:# Plot 3: GCH1
+1774781638319:stats3 <- get_cor_stats(merged_all$met500.ks.emt, merged_all$GCH1)
+1774781638331:title3 <- sprintf("Scatterplot of met500.ks.emt vs GCH1 - (R² = %.2f, p = %.2e)",
+1774781638334:stats3$r_squared, stats3$p_value)
+1774781638340:ggplot(merged_all, aes(x = met500.ks.emt, y = GCH1)) +
+1774781638342:geom_point(color = "steelblue", size = 2) +
+1774781638344:geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
+1774781638346:labs(
+1774781638349:title = title3,
+1774781638351:x = "met500.ks.emt",
+1774781638353:y = "GCH1 (Z-Score)"
+1774781638355:) +
+1774781638357:theme_minimal()
+1774781639253:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774781639290:heat.data <- merged_all.df %>%
+1774781639291:dplyr::select(all_of(c("Sample","met500.ks.emt","Fatty_acid_uptake.gsva",
+1774781639292:"LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774781639294:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774781639295:"CoQ10.gsva","ACSL4","AGPS","FAR1","GCH1")))
+1774781639637:# Sort by EMT_KS_Score
+1774781639641:heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+1774781639668:# Define genes in order
+1774781639671:genes_to_plot <- c("met500.ks.emt",
+1774781639673:"Fatty_acid_uptake.gsva", "LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774781639675:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva","Thioredoxin.gsva","Glutamate_transmembrane.gsva",
+1774781639677:"CoQ10.gsva",
+1774781639679:"ACSL4", "AGPS", "FAR1", "GCH1")
+1774781639684:# Create matrix
+1774781639685:heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+1774781639692:heatmap_data <- t(heatmap_data)
+1774781639698:# Define groups
+1774781639700:group_vec <- c(
+1774781639702:"SortOrder",
+1774781639704:"Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion",
+1774781639705:"Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression",
+1774781639707:"Gene", "Gene", "Gene", "Gene"
+1774781639709:)
+1774781639712:# Create row split factor for spacing
+1774781639714:row_split <- factor(group_vec,
+1774781639716:levels = c("SortOrder", "Ferroptosis promotion",
+1774781639717:"Ferroptosis suppression", "Gene"))
+1774781639720:# Create color functions
+1774781639722:ferroptosis_data <- heatmap_data[2:8, ]
+1774781639726:gene_data <- heatmap_data[9:12, ]
+1774781639730:sortorder_data <- heatmap_data[1, ]
+1774781639734:# Ferroptosis color scale
+1774781639735:ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)),
+1774781639737:c("blue", "white", "red"))
+1774781639748:# Gene color scale: white to dark purple, with 75th percentile as cutoff
+1774781639749:# gene_75_percentile <- quantile(gene_data, 0.75)
+1774781639750:gene_cols <- colorRamp2(c(min(gene_data), 0, max(gene_data)), c("blue", "white", "red"))
+1774781639755:# SortOrder color scale: orange to green
+1774781639756:sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)),
+1774781639758:c("darkorange", "lightgreen"))
+1774781639762:# Step 6: Create heatmap WITH left annotation for group bars
+1774781639763:ht <- Heatmap(heatmap_data,
+1774781639764:cluster_rows = FALSE,
+1774781639766:cluster_columns = FALSE,
+1774781639767:row_split = row_split,
+1774781639768:row_gap = unit(3, "mm"),
+1774781639769:row_names_side = "right",
+1774781639771:show_column_names = FALSE,
+1774781639772:show_heatmap_legend = FALSE,
+1774781639773:left_annotation = rowAnnotation(
+1774781639775:Group = group_vec,
+1774781639776:col = list(Group = c("SortOrder" = "darkgreen",
+1774781639777:"Ferroptosis promotion" = "steelblue",
+1774781639778:"Ferroptosis suppression" = "coral",
+1774781639780:"Gene" = "brown")),
+1774781639781:show_legend = FALSE,
+1774781639782:simple_anno_size = unit(0.8, "cm"),
+1774781639784:gp = gpar(fontsize = 9)
+1774781639785:),
+1774781639786:cell_fun = function(j, i, x, y, w, h, fill) {
+1774781639788:if(i == 1) {
+1774781639789:# SortOrder row
+1774781639790:fill_color <- sortorder_cols(heatmap_data[i, j])
+1774781639791:} else if(i <= 8) {
+1774781639793:# Ferroptosis rows
+1774781639794:fill_color <- ferroptosis_cols(heatmap_data[i, j])
+1774781639795:} else {
+1774781639797:# Gene rows
+1774781639798:fill_color <- gene_cols(heatmap_data[i, j])
+1774781639799:}
+1774781639801:grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+1774781639802:},
+1774781639804:rect_gp = gpar(type = "none"),
+1774781639805:name = "Value",
+1774781639807:width = ncol(heatmap_data)*unit(0.3, "mm"),
+1774781639809:height = nrow(heatmap_data)*unit(9, "mm"))
+1774781639940:# Create separate legends
+1774781639941:group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion",
+1774781639943:"Ferroptosis suppression", "Gene"),
+1774781639944:labels = c("SortOrder", "Ferroptosis promotion",
+1774781639946:"Ferroptosis suppression", "Gene"),
+1774781639947:legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral", "brown")),
+1774781639948:title = "Group Category")
+1774781640031:gene_legend <- Legend(col_fun = gene_cols,
+1774781640033:title = "Gene Expression\nZ-Score",
+1774781640034:direction = "vertical")
+1774781641074:ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+1774781641076:title = "GSVA Scores",
+1774781641077:direction = "vertical")
+1774781642136:sortorder_legend <- Legend(col_fun = sortorder_cols,
+1774781642139:title = "Sort Order\n(EMT_KS_Score)",
+1774781642141:direction = "vertical")
+1774781643194:# Step 8: Draw with legends
+1774781643196:pdf("heatmap.pdf", width = 22, height = 7)
+1774781643199:draw(ht,
+1774781643200:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774781643202:annotation_legend_side = "right",
+1774781643203:padding = unit(c(1, 1, 1, 1), "cm"))
+1774781669273:dev.off()
+1774781669298:# Or view in RStudio
+1774781669300:draw(ht,
+1774781669301:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774781669302:annotation_legend_side = "right",
+1774781669304:padding = unit(c(1, 1, 1, 1), "cm"))
+1774781694961:sessionInfo()
+1774781695158:writeLines(capture.output(sessionInfo()), "01_MET500_dataImport_sessionInfo.txt")
+1774782656776:# Sort by EMT_KS_Score
+1774782656779:heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+1774782656803:# Define genes in order
+1774782656805:genes_to_plot <- c("met500.ks.emt",
+1774782656806:"Fatty_acid_uptake.gsva", "LOXs.gsva", "Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774782656808:"Iron_utilization.gsva", "Glutathione.gsva", "BH4.gsva","Thioredoxin.gsva","Glutamate_transmembrane.gsva","CoQ10.gsva",
+1774782656810:"ACSL4", "AGPS", "FAR1", "GCH1")
+1774782656813:# Create matrix
+1774782656815:heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+1774782656821:heatmap_data <- t(heatmap_data)
+1774782656826:# Define groups
+1774782656828:group_vec <- c("SortOrder",
+1774782656829:"Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion",
+1774782656831:"Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression",
+1774782656833:"Gene", "Gene", "Gene", "Gene"
+1774782656834:)
+1774782656838:# Create row split factor for spacing
+1774782656839:row_split <- factor(group_vec,
+1774782656841:levels = c("SortOrder", "Ferroptosis promotion",
+1774782656842:"Ferroptosis suppression", "Gene"))
+1774782656846:# Create color functions
+1774782656848:# Row 1: SortOrder
+1774782656849:# Rows 2-13: Ferroptosis (12 rows)
+1774782656851:# Rows 14-17: Genes (4 rows)
+1774782656852:ferroptosis_data <- heatmap_data[2:13, ]
+1774782656858:gene_data <- heatmap_data[14:17, ]
+1774782656863:sortorder_data <- heatmap_data[1, ]
+1774782656867:# Ferroptosis color scale
+1774782656869:ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)),
+1774782656871:c("blue", "white", "red"))
+1774782656879:# Gene color scale: white to dark purple, with 75th percentile as cutoff
+1774782656880:# gene_75_percentile <- quantile(gene_data, 0.75)
+1774782656882:gene_cols <- colorRamp2(c(min(gene_data), 0, max(gene_data)), c("blue", "white", "red"))
+1774782656888:# SortOrder color scale: orange to green
+1774782656890:sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)),
+1774782656891:c("darkorange", "lightgreen"))
+1774782656896:# Step 6: Create heatmap WITH left annotation for group bars
+1774782656897:ht <- Heatmap(heatmap_data,
+1774782656899:cluster_rows = FALSE,
+1774782656900:cluster_columns = FALSE,
+1774782656902:row_split = row_split,
+1774782656903:row_gap = unit(3, "mm"),
+1774782656905:row_names_side = "right",
+1774782656906:show_column_names = FALSE,
+1774782656908:show_heatmap_legend = FALSE,
+1774782656909:left_annotation = rowAnnotation(
+1774782656911:Group = group_vec,
+1774782656913:col = list(Group = c("SortOrder" = "darkgreen",
+1774782656914:"Ferroptosis promotion" = "steelblue",
+1774782656916:"Ferroptosis suppression" = "coral",
+1774782656917:"Gene" = "brown")),
+1774782656919:show_legend = FALSE,
+1774782656920:simple_anno_size = unit(0.8, "cm"),
+1774782656922:gp = gpar(fontsize = 9)
+1774782656924:),
+1774782656925:cell_fun = function(j, i, x, y, w, h, fill) {
+1774782656927:if(i == 1) {
+1774782656929:# SortOrder row
+1774782656930:fill_color <- sortorder_cols(heatmap_data[i, j])
+1774782656932:} else if(i <= 13) {
+1774782656934:# Ferroptosis rows
+1774782656936:fill_color <- ferroptosis_cols(heatmap_data[i, j])
+1774782656937:} else {
+1774782656939:# Gene rows
+1774782656941:fill_color <- gene_cols(heatmap_data[i, j])
+1774782656943:}
+1774782656945:grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+1774782656946:},
+1774782656948:rect_gp = gpar(type = "none"),
+1774782656950:name = "Value",
+1774782656951:width = ncol(heatmap_data)*unit(0.3, "mm"),
+1774782656953:height = nrow(heatmap_data)*unit(9, "mm"))
+1774782657182:# Create separate legends
+1774782657184:group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion",
+1774782657185:"Ferroptosis suppression", "Gene"),
+1774782657187:labels = c("SortOrder", "Ferroptosis promotion",
+1774782657189:"Ferroptosis suppression", "Gene"),
+1774782657190:legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral", "brown")),
+1774782657192:title = "Group Category")
+1774782657311:gene_legend <- Legend(col_fun = gene_cols,
+1774782657313:title = "Gene Expression\nZ-Score",
+1774782657315:direction = "vertical")
+1774782658376:ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+1774782658379:title = "GSVA Scores",
+1774782658382:direction = "vertical")
+1774782659435:sortorder_legend <- Legend(col_fun = sortorder_cols,
+1774782659437:title = "Sort Order\n(EMT_KS_Score)",
+1774782659438:direction = "vertical")
+1774782660534:# Step 8: Draw with legends
+1774782660536:pdf("heatmap.pdf", width = 22, height = 7)
+1774782660539:draw(ht,
+1774782660540:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774782660542:annotation_legend_side = "right",
+1774782660543:padding = unit(c(1, 1, 1, 1), "cm"))
+1774782685638:dev.off()
+1774782685663:# Or view in RStudio
+1774782685665:draw(ht,
+1774782685666:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend, gene_legend),
+1774782685668:annotation_legend_side = "right",
+1774782685669:padding = unit(c(1, 1, 1, 1), "cm"))
+1774783227881:merged_all.df <- merged_all %>% rownames_to_column("Sample")
+1774783228063:heat.data <- merged_all.df %>%
+1774783228064:dplyr::select(all_of(c("Sample",
+1774783228066:"met500.ks.emt",
+1774783228067:"Fatty_acid_uptake.gsva","Iron_intake.gsva", "Membrane_Lipid.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva",
+1774783228068:"Iron_utilization.gsva", "Glutathione.gsva",
+1774783228069:"BH4.gsva", "Thioredoxin.gsva","Glutamate_transmembrane.gsva")))
+1774783229629:# Sort by EMT_KS_Score
+1774783229632:heat.data.sorted <- heat.data[order(heat.data$met500.ks.emt), ]
+1774783229696:# Define genes in order
+1774783229698:genes_to_plot <- c("met500.ks.emt",
+1774783229700:"Fatty_acid_uptake.gsva", "Unsat_FA_biosynth_process.gsva", "Fatty_acid.gsva", "Membrane_Lipid.gsva", "Iron_intake.gsva", "Iron_utilization.gsva",
+1774783229701:"BH4.gsva","Thioredoxin.gsva","Glutathione.gsva","Glutamate_transmembrane.gsva")
+1774783229705:# Create matrix
+1774783229706:heatmap_data <- as.matrix(heat.data.sorted[, genes_to_plot])
+1774783229712:heatmap_data <- t(heatmap_data)
+1774783229717:# Define groups
+1774783229719:group_vec <- c("SortOrder",
+1774783229721:"Ferroptosis promotion", "Ferroptosis promotion", "Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion","Ferroptosis promotion",
+1774783229723:"Ferroptosis suppression", "Ferroptosis suppression","Ferroptosis suppression", "Ferroptosis suppression")
+1774783229726:# Create row split factor for spacing
+1774783229728:row_split <- factor(group_vec,
+1774783229729:levels = c("SortOrder",
+1774783229731:"Ferroptosis promotion",
+1774783229732:"Ferroptosis suppression"))
+1774783229736:# Create color functions
+1774783229737:# Row 1: SortOrder
+1774783229739:# Rows 2-11: Ferroptosis (12 rows)
+1774783229740:ferroptosis_data <- heatmap_data[2:11, ]
+1774783229745:sortorder_data <- heatmap_data[1, ]
+1774783229749:# Ferroptosis color scale
+1774783229751:ferroptosis_cols <- colorRamp2(c(min(ferroptosis_data), 0, max(ferroptosis_data)),
+1774783229752:c("blue", "white", "red"))
+1774783229759:# SortOrder color scale: orange to green
+1774783229761:sortorder_cols <- colorRamp2(c(min(sortorder_data), max(sortorder_data)),
+1774783229763:c("darkorange", "lightgreen"))
+1774783229768:# Create heatmap WITH left annotation for group bars
+1774783229769:ht <- Heatmap(heatmap_data,
+1774783229771:cluster_rows = FALSE,
+1774783229772:cluster_columns = FALSE,
+1774783229774:row_split = row_split,
+1774783229775:row_gap = unit(3, "mm"),
+1774783229777:row_names_side = "right",
+1774783229778:show_column_names = FALSE,
+1774783229780:show_heatmap_legend = FALSE,
+1774783229781:left_annotation = rowAnnotation(
+1774783229783:Group = group_vec,
+1774783229784:col = list(Group = c("SortOrder" = "darkgreen",
+1774783229786:"Ferroptosis promotion" = "steelblue",
+1774783229788:"Ferroptosis suppression" = "coral")),
+1774783229789:show_legend = FALSE,
+1774783229791:simple_anno_size = unit(0.8, "cm"),
+1774783229792:gp = gpar(fontsize = 9)
+1774783229794:),
+1774783229795:cell_fun = function(j, i, x, y, w, h, fill) {
+1774783229797:if(i == 1) {
+1774783229798:# SortOrder row
+1774783229800:fill_color <- sortorder_cols(heatmap_data[i, j])
+1774783229802:} else if(i <= 11) {
+1774783229803:# Ferroptosis rows
+1774783229805:fill_color <- ferroptosis_cols(heatmap_data[i, j])
+1774783229806:}
+1774783229808:grid.rect(x, y, w, h, gp = gpar(fill = fill_color, col = NA))
+1774783229809:},
+1774783229811:rect_gp = gpar(type = "none"),
+1774783229812:name = "Value",
+1774783229814:width = ncol(heatmap_data)*unit(0.3, "mm"),
+1774783229815:height = nrow(heatmap_data)*unit(9, "mm"))
+1774783230045:# Create separate legends
+1774783230046:group_legend <- Legend(at = c("SortOrder", "Ferroptosis promotion",
+1774783230047:"Ferroptosis suppression"),
+1774783230049:labels = c("SortOrder", "Ferroptosis promotion",
+1774783230050:"Ferroptosis suppression"),
+1774783230051:legend_gp = gpar(fill = c("darkgreen", "steelblue", "coral")),
+1774783230052:title = "Group Category")
+1774783230139:ferroptosis_legend <- Legend(col_fun = ferroptosis_cols,
+1774783230141:title = "GSVA Scores",
+1774783230142:direction = "vertical")
+1774783231358:sortorder_legend <- Legend(col_fun = sortorder_cols,
+1774783231362:title = "Sort Order\n(EMT_KS_Score)",
+1774783231365:direction = "vertical")
+1774783232429:# Step 8: Draw with legends
+1774783232431:pdf("heatmap_v2.pdf", width = 22, height = 7)
+1774783232461:draw(ht,
+1774783232462:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend),
+1774783232464:annotation_legend_side = "right",
+1774783232466:padding = unit(c(1, 1, 1, 1), "cm"))
+1774783248538:dev.off()
+1774783248587:# Or view in RStudio
+1774783248589:draw(ht,
+1774783248591:annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend),
+1774783248592:annotation_legend_side = "right",
+1774783248593:padding = unit(c(1, 1, 1, 1), "cm"))
