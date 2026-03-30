@@ -539,7 +539,7 @@ stats1 <- get_cor_stats(merged_all$fuscc.ks.emt, merged_all$BH4.gsva)
 title1 <- sprintf("Scatterplot of fuscc.ks.emt vs BH4.gsva - (R² = %.2f, p = %.2e)", 
                   stats1$r_squared, stats1$p_value)
 
-ggplot(merged_all, aes(x = fuscc.ks.emt, y = BH4.gsva)) +
+BH4.scatter <- ggplot(merged_all, aes(x = fuscc.ks.emt, y = BH4.gsva)) +
   geom_point(color = "steelblue", size = 2) +
   geom_smooth(method = "lm", se = TRUE, color = "red", fill = "red", alpha = 0.2) +
   labs(
@@ -548,6 +548,11 @@ ggplot(merged_all, aes(x = fuscc.ks.emt, y = BH4.gsva)) +
     y = "BH4 gsva"
   ) +
   theme_minimal()
+BH4.scatter
+
+pdf("bh4_scatter.pdf", width = 6, height = 7)
+BH4.scatter
+dev.off()
 
 # Plot 2: ACSL4
 stats2 <- get_cor_stats(merged_all$fuscc.ks.emt, merged_all$ACSL4)
