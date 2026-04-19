@@ -1,6 +1,7 @@
 # R files and directories
 .Rhistory
 .RData
+.rds
 .Rproj.user/
 *.Rproj
 .Rprofile
