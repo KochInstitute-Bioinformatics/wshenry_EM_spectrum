@@ -34,8 +34,6 @@ library(SeuratWrappers)
 #library(Azimuth)
 library(patchwork)
 library(sctransform)
-library(celldex)
-library(SingleR)
 library(rtracklayer)
 library(apeglm)
 library(ComplexHeatmap)
@@ -43,7 +41,6 @@ library(gprofiler2)
 library(cluster)
 library(fgsea)
 library(SingleCellExperiment)
-library(VAM)
 library(UCell)
 library(GSVA)
 library(GSEABase)
@@ -58,11 +55,11 @@ library(grid)
 # Load Local Code
 
 ```{r}
-source('Rcode/data_formatting_tools.R')
-source('Rcode/analysis_tools.R')
-source('Rcode/plots.R')
-source('Rcode/common.R')
-source('Rcode/ssGSEA.Library.R')
+source('../../Rcode/data_formatting_tools.R')
+source('../../Rcode/analysis_tools.R')
+source('../../Rcode/plots.R')
+source('../../Rcode/common.R')
+source('../../Rcode/ssGSEA.Library.R')
 ```
 
 # Read in FUSCC data
@@ -70,13 +67,13 @@ source('Rcode/ssGSEA.Library.R')
 ## Gene expression data
 
 ```{r}
-fuscc <- read.csv("../data/FUSCCTNBC_Expression_RNAseqFPKM.csv")
+fuscc <- read.csv("../../data/FUSCC_EMT/FUSCCTNBC_Expression_RNAseqFPKM.csv")
 ```
 
 ## Annotation of the data
 
-```{r}
-z <- import("https://ftp.ensembl.org/pub/current_gtf/homo_sapiens/Homo_sapiens.GRCh38.115.chr.gtf.gz")
+```{r cache=FALSE}
+z <- rtracklayer::import("https://ftp.ensembl.org/pub/current_gtf/homo_sapiens/Homo_sapiens.GRCh38.115.chr.gtf.gz")
 
 # tx2gene <- as.data.frame(z) %>% select(c('transcript_id','gene_id'))
 # tx2gene <- unique(tx2gene)
@@ -403,20 +400,6 @@ exhausted.CD8 <- c("PDCD1","CTLA4","LAG3","HAVCR2","TIGIT","TOX","EOMES","TBX21"
 
 ## Score gene sets for heatmap using gsva
 
-the heatmap contains the following gene sets:
-
-Gene list       pathway type
-Fatty acid uptake       Ferroptosis promotion
-LOXs    Ferroptosis promotion
-Iron intake WHv1        Ferroptosis promotion
-Iron utilization        Ferroptosis promotion
-Glutathione     Ferroptosis suppression
-BH4     Ferroptosis suppression
-CoQ10   Ferroptosis suppression
-ACSL4   Gene
-AGPS    Gene
-FAR1    Gene
-
 ```{r}
 gsva_params <- gsvaParam(exprData = expr_matrix, 
                          geneSets = list(
@@ -448,13 +431,13 @@ Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
 ## Import KS code
 
 ```{r}
-source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+source("../../emt_code/Chakraborty_et_al_KS_code_vCAW.R")
 ```
 
 ## Point to signature file
 
 ```{r}
-KSScore.EMTSignature.file = "./emt_code/EM_gene_signature_tumor_KS.xlsx"
+KSScore.EMTSignature.file = "../../emt_code/EM_gene_signature_tumor_KS.xlsx"
 ```
 
 ## Calculate KS
@@ -805,7 +788,7 @@ ht <- Heatmap(heatmap_data,
         },
         rect_gp = gpar(type = "none"),
         name = "Value",
-        width = ncol(heatmap_data)*unit(0.3, "mm"),
+        width = ncol(heatmap_data)*unit(0.8, "mm"),
         height = nrow(heatmap_data)*unit(9, "mm"))
 
 # Create separate legends
@@ -841,6 +824,39 @@ draw(ht,
      annotation_legend_list = list(group_legend, sortorder_legend, ferroptosis_legend),
      annotation_legend_side = "right",
      padding = unit(c(1, 1, 1, 1), "cm"))
+```
+
+# Subset full data matrix to HER2+ based on expression of ERBB2
+
+This group of samples can be defined using expression of ERBB2
+
+## Examine expression of ERBB2
+
+```{r}
+# Extract ERBB2 expression values across all samples
+erbb2_values <- expr_matrix["ERBB2", ]
+
+# Calculate threshold
+threshold <- quantile(erbb2_values, 0.75)
+her2_positive_samples <- names(erbb2_values[erbb2_values > threshold])
+
+data.frame(ERBB2 = erbb2_values) %>%
+  mutate(group = ifelse(ERBB2 > threshold, "HER2+", "HER2-")) %>%
+  ggplot(aes(x = ERBB2, fill = group)) +
+  geom_histogram(bins = 30, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("HER2-" = "steelblue", "HER2+" = "green")) +
+  geom_vline(aes(xintercept = threshold), color = "red", linetype = "dashed", linewidth = 1) +
+  theme_minimal() +
+  labs(title = "ERBB2 Expression Distribution in FUSCC Samples",
+       x = "ERBB2 Expression (log2 + 1)",
+       y = "Number of Samples",
+       fill = "Sample Type")
+
+# Summary
+cat(sprintf("HER2+ samples identified: %d / %d total (%.1f%%)\n", 
+            length(her2_positive_samples), length(erbb2_values),
+            100*length(her2_positive_samples)/length(erbb2_values)))
+cat(sprintf("Threshold: %.3f\n", threshold))
 ```
 
 # write session info

@@ -34,7 +34,6 @@ library(SeuratWrappers)
 #library(Azimuth)
 library(patchwork)
 library(sctransform)
-library(celldex)
 library(SingleR)
 library(rtracklayer)
 library(apeglm)
@@ -43,7 +42,6 @@ library(gprofiler2)
 library(cluster)
 library(fgsea)
 library(SingleCellExperiment)
-library(VAM)
 library(UCell)
 library(GSVA)
 library(GSEABase)
@@ -58,18 +56,18 @@ library(grid)
 # Load Local Code
 
 ```{r}
-source('Rcode/data_formatting_tools.R')
-source('Rcode/analysis_tools.R')
-source('Rcode/plots.R')
-source('Rcode/common.R')
-source('Rcode/ssGSEA.Library.R')
+source('../../Rcode/data_formatting_tools.R')
+source('../../Rcode/analysis_tools.R')
+source('../../Rcode/plots.R')
+source('../../Rcode/common.R')
+source('../../Rcode/ssGSEA.Library.R')
 ```
 
 # Import metadata
 
 ```{r}
 # Subset metadata based on matched sample IDs
-metadata <- read.delim("../data/Deduplicated_Metadata.txt")
+metadata <- read.delim("../../data/TCGA_EMT/Deduplicated_Metadata.txt")
 
 # Adjust sample IDs in metadata to match colnames(seurat_obj)
 metadata$bcr_patient_barcode <- gsub("-", ".", metadata$bcr_patient_barcode)
@@ -78,8 +76,8 @@ metadata$bcr_patient_barcode <- gsub("-", ".", metadata$bcr_patient_barcode)
 # Import TCGA data
 
 ```{r}
-header_info <- readLines("../data/geneexpressionmatrix_uniqueIDs.gct", n = 2)
-pan.cancer.expression <- read.delim("../data/geneexpressionmatrix_uniqueIDs.gct", skip = 2)
+header_info <- readLines("../../data/TCGA_EMT/geneexpressionmatrix_uniqueIDs.gct", n = 2)
+pan.cancer.expression <- read.delim("../../data/TCGA_EMT/geneexpressionmatrix_uniqueIDs.gct", skip = 2)
 ```
 
 ## Reformat gct expression data for plotting and analysis
@@ -115,6 +113,12 @@ tcga.brca <- merged_df %>%
 
 ```{r}
 expr_matrix <- log2(tcga.brca+1)  
+```
+
+### Export the tcga matrix for use elsewhere
+
+```{r}
+saveRDS(expr_matrix, file = "expr_matrix.rds")
 ```
 
 ## Row-center and transpose the gene expression data for use later
@@ -385,13 +389,13 @@ Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
 ## Import KS code
 
 ```{r}
-source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+source("../../emt_code/Chakraborty_et_al_KS_code_vCAW.R")
 ```
 
 ## Point to signature file
 
 ```{r}
-KSScore.EMTSignature.file = "./emt_code/EM_gene_signature_tumor_KS.xlsx"
+KSScore.EMTSignature.file = "../../emt_code/EM_gene_signature_tumor_KS.xlsx"
 ```
 
 ## Calculate KS

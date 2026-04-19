@@ -9,7 +9,7 @@
 #SBATCH --error=slurm.%N.%j.err      # STDERR output file (optional)
 
 module load java/11.0.12
-module load singularity/3.5.0
+module load singularity/3.10.4
 
 # Create temporary directory to be populated with directories to bind-mount in the container
 # where writable file systems are necessary. Adjust path as appropriate for your computing environment.
@@ -36,7 +36,16 @@ END
 
 chmod +x ${workdir}/rsession.sh
 
-export SINGULARITY_BIND="${workdir}/run:/run,${workdir}/tmp:/tmp,${workdir}/database.conf:/etc/rstudio/database.conf,${workdir}/rsession.sh:/etc/rstudio/rsession.sh,${workdir}/var/lib/rstudio-server:/var/lib/rstudio-server"
+binds="${workdir}/run:/run"
+binds+=",${workdir}/tmp:/tmp"
+binds+=",${workdir}/database.conf:/etc/rstudio/database.conf"
+binds+=",${workdir}/rsession.sh:/etc/rstudio/rsession.sh"
+binds+=",${workdir}/var/lib/rstudio-server:/var/lib/rstudio-server"
+binds+=",/net/bmc-lab3/data/bcc/projects/wshenry-Henry/032526_EMT_Heatmaps/data:/data"
+binds+=",/net/bmc-lab3/data/bcc/projects/wshenry-Henry/032526_EMT_Heatmaps/Rcode:/Rcode"
+binds+=",/net/bmc-lab3/data/bcc/projects/wshenry-Henry/032526_EMT_Heatmaps/emt_code:/emt_code"
+
+export SINGULARITY_BIND="$binds"
 
 # Do not suspend idle sessions.
 # Alternative to setting session-timeout-minutes=0 in /etc/rstudio/rsession.conf
@@ -71,7 +80,7 @@ When done using RStudio Server, terminate the job by:
       scancel -f ${SLURM_JOB_ID}
 END
 
-singularity exec --cleanenv -H $PWD:/home/rstudio docker://yannvrb56/r4_5_1_python3_singlecell_visium \
+singularity exec --cleanenv -H $PWD:/home/rstudio docker://bumproo/r4_5_3_singlecell_bulk_rnaseq:latest \
     /usr/lib/rstudio-server/bin/rserver --server-user ${USER} --www-port ${PORT} \
             --auth-none=0 \
             --auth-pam-helper-path=pam-helper \

@@ -34,7 +34,6 @@ library(SeuratWrappers)
 #library(Azimuth)
 library(patchwork)
 library(sctransform)
-library(celldex)
 library(SingleR)
 library(rtracklayer)
 library(apeglm)
@@ -43,7 +42,6 @@ library(gprofiler2)
 library(cluster)
 library(fgsea)
 library(SingleCellExperiment)
-library(VAM)
 library(UCell)
 library(GSVA)
 library(GSEABase)
@@ -58,11 +56,11 @@ library(grid)
 # Load Local Code
 
 ```{r}
-source('Rcode/data_formatting_tools.R')
-source('Rcode/analysis_tools.R')
-source('Rcode/plots.R')
-source('Rcode/common.R')
-source('Rcode/ssGSEA.Library.R')
+source('../../Rcode/data_formatting_tools.R')
+source('../../Rcode/analysis_tools.R')
+source('../../Rcode/plots.R')
+source('../../Rcode/common.R')
+source('../../Rcode/ssGSEA.Library.R')
 ```
 
 # Read in MET500 data
@@ -70,7 +68,7 @@ source('Rcode/ssGSEA.Library.R')
 ## Metadata
 
 ```{r}
-meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
+meta <- read.table("../../data/MET500/MET500_geneExpression_M.meta.plus.txt", header = TRUE, row.names = 1, sep = "\t")
 ```
 
 ## Gene expression data
@@ -78,9 +76,9 @@ meta <- read.table("../data/MET500_geneExpression_M.meta.plus.txt", header = TRU
 Note, the l2 data provided seems to have been transformed without a +1 offset so this needs to be redone
 
 ```{r}
-M.mx <- read.table("../data/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
-# M.mx.l2 <- read.table("../data/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
-M.mx.l2.z <- read.table("../data/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
+M.mx <- read.table("../../data/MET500/MET500_geneExpression_M.mx.txt", header = TRUE, row.names = 1, sep = "\t")
+# M.mx.l2 <- read.table("../../data/MET500/MET500_geneExpression_M.mx.log2.txt", header = TRUE, row.names = 1, sep = "\t")
+M.mx.l2.z <- read.table("../../data/MET500/MET500_geneExpression_M.mx.log2.zscore.txt", header = TRUE, row.names = 1, sep = "\t")
 ```
 
 ```{r}
@@ -90,7 +88,7 @@ M.mx.l2 <- log2(M.mx+1)
 ## Read in annotation
 
 ```{r}
-annot <- read.table("../data/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
+annot <- read.table("../../data/MET500/probeMap_gencode.v23.annotation.gene.probemap", header = TRUE, row.names = 1, sep = "\t")
 ```
 
 ## Join gene from annot to gene expression
@@ -453,13 +451,13 @@ Heatmap.GSVA.scores.transposed <- t(Heatmap.GSVA.scores)
 ## Import KS code
 
 ```{r}
-source("./emt_code/Chakraborty_et_al_KS_code_vCAW.R")
+source("../../emt_code/Chakraborty_et_al_KS_code_vCAW.R")
 ```
 
 ## Point to signature file
 
 ```{r}
-KSScore.EMTSignature.file = "./emt_code/EM_gene_signature_tumor_KS.xlsx"
+KSScore.EMTSignature.file = "../../emt_code/EM_gene_signature_tumor_KS.xlsx"
 ```
 
 ## Calculate KS

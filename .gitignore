@@ -8,6 +8,10 @@ R/
 *.config/
 *.local/
 
+# R Markdown output directories
+*_cache/
+*_files/
+
 # Large files
 # path to file
 
